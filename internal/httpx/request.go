@@ -2,10 +2,8 @@ package httpx
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 	"strings"
 	"time"
@@ -14,18 +12,18 @@ import (
 	"github.com/Amrakk/zcago/session"
 )
 
-func getDefaultHeaders(sc *session.Context, origin string) (http.Header, error) {
+func getDefaultHeaders(sc session.Context, origin string) (http.Header, error) {
 	if origin == "" {
 		origin = "https://chat.zalo.me"
 	}
-	if sc == nil || sc.Cookie == nil {
+	if sc == nil || len(sc.Cookies()) == 0 {
 		return nil, errs.NewZCAError("cookie is not available", "context", nil)
 	}
-	if sc.UserAgent == "" {
+	if sc.UserAgent() == "" {
 		return nil, errs.NewZCAError("user agent is not available", "context", nil)
 	}
 
-	cookieStr, err := cookieString(sc.Cookie, origin)
+	cookieStr, err := cookieString(sc.Cookies(), origin)
 	if err != nil {
 		return nil, err
 	}
@@ -38,16 +36,11 @@ func getDefaultHeaders(sc *session.Context, origin string) (http.Header, error) 
 	h.Set("Cookie", cookieStr)
 	h.Set("Origin", "https://chat.zalo.me")
 	h.Set("Referer", "https://chat.zalo.me/")
-	h.Set("User-Agent", sc.UserAgent)
+	h.Set("User-Agent", sc.UserAgent())
 	return h, nil
 }
 
-func cookieString(jar http.CookieJar, origin string) (string, error) {
-	u, err := url.Parse(origin)
-	if err != nil {
-		return "", err
-	}
-	cookies := jar.Cookies(u)
+func cookieString(cookies []*http.Cookie, origin string) (string, error) {
 	if len(cookies) == 0 {
 		return "", nil
 	}
@@ -66,21 +59,15 @@ func cookieString(jar http.CookieJar, origin string) (string, error) {
 // ---- Public API ----
 const maxRedirects = 10
 
-func Request(ctx context.Context, cb *session.Context, urlStr string, opt *RequestOptions, raw bool) (*http.Response, error) {
-	return requestWithRedirect(ctx, cb, urlStr, opt, raw, 0)
+func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool) (*http.Response, error) {
+	return requestWithRedirect(ctx, sc, urlStr, opt, raw, 0)
 }
 
-func requestWithRedirect(ctx context.Context, sc *session.Context, urlStr string, opt *RequestOptions, raw bool, depth int) (*http.Response, error) {
+func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool, depth int) (*http.Response, error) {
 	if depth > maxRedirects {
-		return nil, errors.New("too many redirects")
+		return nil, errs.NewZCAError("too many redirects", "request", nil)
 	}
 
-	if sc.Cookie == nil {
-		jar, _ := cookiejar.New(nil)
-		sc.Cookie = jar
-	}
-
-	// Build headers
 	origin := originOf(urlStr)
 	headers := http.Header{}
 	if !raw {
@@ -88,19 +75,15 @@ func requestWithRedirect(ctx context.Context, sc *session.Context, urlStr string
 		if err != nil {
 			return nil, err
 		}
-		mergeHeader(headers, def) // defaults first
+		mergeHeader(headers, def)
 	}
 	if opt != nil && opt.Headers != nil {
-		mergeHeader(headers, opt.Headers) // user overrides
+		mergeHeader(headers, opt.Headers)
 	}
 
-	// Method/body
 	method := "GET"
 	var body io.Reader
 	if opt != nil {
-		// if opt.Method != "" {
-		// 	method = strings.ToUpper(opt.Method)
-		// }
 		body = opt.Body
 	}
 
@@ -118,7 +101,7 @@ func requestWithRedirect(ctx context.Context, sc *session.Context, urlStr string
 		// Return the first response and let us handle Location manually
 		return http.ErrUseLastResponse
 	}
-	client.Jar = sc.Cookie
+	client.Jar = sc.CookieJar()
 
 	// Do
 	resp, err := client.Do(req)
@@ -128,20 +111,17 @@ func requestWithRedirect(ctx context.Context, sc *session.Context, urlStr string
 
 	// Persist cookies from Set-Cookie (domain-aware), only when not raw
 	if !raw {
-		if err := persistSetCookies(sc.Cookie, resp, origin); err != nil {
-			// Non-fatal; continue
+		if err := persistSetCookies(sc.CookieJar(), resp, origin); err != nil {
+			Logger(sc).Warn("failed to persist cookies")
 		}
 	}
 
-	// Manual redirect?
 	if loc := resp.Header.Get("Location"); loc != "" {
-		// Close body before following
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 
 		nextURL := ResolveURL(urlStr, loc)
 		nextOpt := &RequestOptions{
-			// Method: "GET",
 			Headers: func() http.Header {
 				h := headers.Clone()
 				if !raw {
@@ -158,9 +138,9 @@ func requestWithRedirect(ctx context.Context, sc *session.Context, urlStr string
 }
 
 // ---- Helpers ----
-func buildClient(cb *session.Context) *http.Client {
-	if cb.Options.Client != nil {
-		cp := *cb.Options.Client
+func buildClient(sc session.MutableContext) *http.Client {
+	if sc.Client() != nil {
+		cp := *sc.Client()
 		return &cp
 	}
 

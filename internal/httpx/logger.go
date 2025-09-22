@@ -31,7 +31,7 @@ type logChain struct {
 	withCaller bool
 }
 
-func Logger(sc *session.Context) *logChain {
+func Logger(sc session.Context) *logChain {
 	return &logChain{
 		enabled:   sc.IsLogging(),
 		minLevel:  Verbose,

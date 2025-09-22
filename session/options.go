@@ -4,51 +4,58 @@ import (
 	"net/http"
 )
 
-type Options struct {
-	SelfListen  bool
-	CheckUpdate bool
-	Logging     bool
-	APIType     uint
-	APIVersion  uint
+type Option func(*options)
 
-	Client *http.Client
+type options struct {
+	selfListen  bool
+	checkUpdate bool
+	logging     bool
+	apiType     uint
+	apiVersion  uint
 
-	ImageMetadataGetter ImageMetadataGetter
+	client *http.Client
+
+	imageMetadataGetter ImageMetadataGetter
 }
 
-func ApplyOptions(input *Options) Options {
-	defaults := defaultInternalOptions()
-
-	if input == nil {
-		return defaults
-	}
-
-	result := defaults
-	if input.SelfListen {
-		result.SelfListen = input.SelfListen
-	}
-	result.CheckUpdate = input.CheckUpdate
-	result.Logging = input.Logging
-	if input.APIType != 0 {
-		result.APIType = input.APIType
-	}
-	if input.APIVersion != 0 {
-		result.APIVersion = input.APIVersion
-	}
-	if input.ImageMetadataGetter != nil {
-		result.ImageMetadataGetter = input.ImageMetadataGetter
-	}
-
-	return result
+func WithSelfListen(v bool) Option {
+	return func(o *options) { o.selfListen = v }
 }
 
-func defaultInternalOptions() Options {
-	return Options{
-		SelfListen:  false,
-		CheckUpdate: true,
-		Logging:     true,
-		APIType:     30,
-		APIVersion:  665,
+func WithCheckUpdate(v bool) Option {
+	return func(o *options) { o.checkUpdate = v }
+}
+func WithLogging(v bool) Option {
+	return func(o *options) { o.logging = v }
+}
+func WithAPIType(t uint) Option {
+	return func(o *options) {
+		if t != 0 {
+			o.apiType = t
+		}
+	}
+}
+func WithAPIVersion(v uint) Option {
+	return func(o *options) {
+		if v != 0 {
+			o.apiVersion = v
+		}
+	}
+}
+func WithHTTPClient(c *http.Client) Option {
+	return func(o *options) { o.client = c }
+}
+func WithImageMetadataGetter(f ImageMetadataGetter) Option {
+	return func(o *options) { o.imageMetadataGetter = f }
+}
+
+func defaultOptions() options {
+	return options{
+		selfListen:  false,
+		checkUpdate: true,
+		logging:     true,
+		apiType:     30,
+		apiVersion:  665,
 	}
 }
 

@@ -16,26 +16,48 @@ type Credentials struct {
 	Language  *string     `json:"language,omitempty"`
 }
 
-type LoginQROption struct {
-	UserAgent *string `json:"userAgent,omitempty"`
-	Language  *string `json:"language,omitempty"`
-	QRPath    *string `json:"qrPath,omitempty"`
+func NewCredentials(imei string, cookie CookieUnion, userAgent string, language *string) Credentials {
+	return Credentials{
+		Imei:      imei,
+		Cookie:    cookie,
+		UserAgent: userAgent,
+		Language:  language,
+	}
 }
-
-type LoginQRCallback func(event any) (any, error)
 
 type SameSite string
 
 const (
-	SameSiteDefault SameSite = "default"
+	SameSiteDefault SameSite = ""
 	SameSiteLax     SameSite = "lax"
 	SameSiteStrict  SameSite = "strict"
 	SameSiteNone    SameSite = "none"
 )
 
+func (s SameSite) MarshalJSON() ([]byte, error) {
+	if s == "" {
+		return []byte("null"), nil
+	}
+	return json.Marshal(string(s))
+}
+
+func (s *SameSite) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte("null")) {
+		*s = ""
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+	*s = SameSite(str)
+	return nil
+}
+
 type Cookie struct {
 	Domain         string   `json:"domain"`
-	ExpirationDate float32  `json:"expirationDate"`
+	ExpirationDate float64  `json:"expirationDate"`
 	HostOnly       bool     `json:"hostOnly"`
 	HTTPOnly       bool     `json:"httpOnly"`
 	Name           string   `json:"name"`
@@ -69,7 +91,9 @@ func (c Cookie) ToHTTPCookie() *http.Cookie {
 	}
 
 	if !c.Session && c.ExpirationDate > 0 {
-		hc.Expires = time.Unix(int64(c.ExpirationDate), 0)
+		sec := int64(c.ExpirationDate)                         // whole seconds
+		nsec := int64((c.ExpirationDate - float64(sec)) * 1e9) // fractional part → nanoseconds
+		hc.Expires = time.Unix(sec, nsec)
 	}
 
 	return hc
@@ -80,7 +104,7 @@ func (c *Cookie) FromHTTPCookie(hc *http.Cookie) {
 	c.Name = hc.Name
 	c.Value = hc.Value
 	c.Path = hc.Path
-	c.HTTPOnly = hc.HttpOnly
+	c.HTTPOnly = hc.Domain == ""
 	c.Secure = hc.Secure
 	c.HostOnly = false
 	c.StoreID = nil
@@ -96,12 +120,17 @@ func (c *Cookie) FromHTTPCookie(hc *http.Cookie) {
 		c.SameSite = SameSiteDefault
 	}
 
-	if hc.Expires.IsZero() {
+	switch {
+	case hc.MaxAge > 0:
+		exp := time.Now().Add(time.Duration(hc.MaxAge) * time.Second)
+		c.Session = false
+		c.ExpirationDate = float64(exp.UnixNano()) / 1e9
+	case hc.MaxAge == 0 && !hc.Expires.IsZero():
+		c.Session = false
+		c.ExpirationDate = float64(hc.Expires.UnixNano()) / 1e9
+	default:
 		c.Session = true
 		c.ExpirationDate = 0
-	} else {
-		c.Session = false
-		c.ExpirationDate = float32(hc.Expires.Unix())
 	}
 }
 
@@ -115,14 +144,32 @@ type CookieUnion struct {
 	j2cookie *J2Cookie
 }
 
+func NewHTTPCookie(hc []*http.Cookie) CookieUnion {
+	cu := CookieUnion{}
+	if hc == nil {
+		cu.cookies = nil
+		cu.j2cookie = nil
+		return cu
+	}
+
+	cookies := make([]Cookie, len(hc))
+	for i, c := range hc {
+		var ck Cookie
+		ck.FromHTTPCookie(c)
+		cookies[i] = ck
+	}
+
+	cu.cookies = cookies
+	cu.j2cookie = nil
+	return cu
+}
 func NewCookieArray(c []Cookie) CookieUnion { return CookieUnion{cookies: c} }
 func NewJ2Cookie(j J2Cookie) CookieUnion    { return CookieUnion{j2cookie: &j} }
 
-func (cu CookieUnion) IsValid() bool    { return cu.cookies != nil || cu.j2cookie != nil }
-func (cu CookieUnion) IsArray() bool    { return cu.cookies != nil }
-func (cu CookieUnion) IsJ2Cookie() bool { return cu.j2cookie != nil }
-
-func (cu CookieUnion) GetCookies() []Cookie {
+func (cu *CookieUnion) IsValid() bool    { return cu.cookies != nil || cu.j2cookie != nil }
+func (cu *CookieUnion) IsArray() bool    { return cu.cookies != nil }
+func (cu *CookieUnion) IsJ2Cookie() bool { return cu.j2cookie != nil }
+func (cu *CookieUnion) GetCookies() []Cookie {
 	if cu.cookies != nil {
 		return cu.cookies
 	}
@@ -130,6 +177,18 @@ func (cu CookieUnion) GetCookies() []Cookie {
 		return cu.j2cookie.Cookies
 	}
 	return nil
+}
+
+func (cu *CookieUnion) GetHTTPCookies() []*http.Cookie {
+	cookies := cu.GetCookies()
+	if cookies == nil {
+		return nil
+	}
+	httpCookies := make([]*http.Cookie, len(cookies))
+	for i, c := range cookies {
+		httpCookies[i] = c.ToHTTPCookie()
+	}
+	return httpCookies
 }
 
 func (cu CookieUnion) MarshalJSON() ([]byte, error) {

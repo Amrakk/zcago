@@ -12,7 +12,7 @@ linters-install: ### install golangci-lint if not present
 .PHONY: linters-install
 
 lint: ### run linters
-	linters-install
+	make linters-install
 	golangci-lint run
 .PHONY: lint
 

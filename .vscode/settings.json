@@ -21,5 +21,7 @@
         "zfamily",
         "zimsg",
         "zmodel"
-    ]
+    ],
+    "git.decorations.enabled": true,
+    "scm.diffDecorationsGutterVisibility": "always"
 }

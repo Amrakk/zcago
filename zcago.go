@@ -6,10 +6,12 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 
+	"github.com/Amrakk/zcago/api"
 	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/session"
 	"github.com/Amrakk/zcago/session/auth"
+	"github.com/Amrakk/zcago/version"
 )
 
 type Zalo interface {
@@ -18,22 +20,21 @@ type Zalo interface {
 }
 
 type zalo struct {
-	EnableEncryptParam bool
-	Options            session.Options
+	enableEncryptParam bool
+	opts               []Option
 }
 
-func NewZalo(opts *session.Options) Zalo {
+func NewZalo(opts ...Option) Zalo {
 	z := &zalo{
-		EnableEncryptParam: true,
-		Options:            session.ApplyOptions(opts),
+		enableEncryptParam: true,
+		opts:               opts,
 	}
 
 	return z
 }
 
 func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
-	appCtx := session.NewContext(z.Options.APIType, z.Options.APIVersion)
-	appCtx.Options = z.Options
+	appCtx := session.NewContext(toSessionOptions(z.opts...)...)
 
 	return z.loginCookie(ctx, appCtx, cred)
 }
@@ -78,25 +79,26 @@ func (z *zalo) LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallb
 	panic("unimplemented")
 }
 
-func (z *zalo) loginCookie(ctx context.Context, sc *session.Context, cred Credentials) (API, error) {
+func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred Credentials) (API, error) {
+	version.CheckUpdate(sc)
 	z.validateParams(cred)
 
-	sc.IMEI = cred.Imei
-	sc.Cookie = z.parseCookies(cred.Cookie)
-	sc.UserAgent = cred.UserAgent
-
-	if cred.Language != nil {
-		sc.Language = *cred.Language
-	} else {
-		sc.Language = "vi"
+	lang := "vi"
+	if cred.Language != nil && *cred.Language != "" {
+		lang = *cred.Language
 	}
 
-	loginInfo, err := auth.Login(ctx, sc, z.EnableEncryptParam)
+	sc.SetIMEI(cred.Imei)
+	sc.SetLanguage(lang)
+	sc.SetUserAgent(cred.UserAgent)
+	sc.SetCookieJar(z.parseCookies(cred.Cookie))
+
+	loginInfo, err := auth.Login(ctx, sc, z.enableEncryptParam)
 	if err != nil {
 		httpx.Logger(sc).Error("Login failed", err)
 		return nil, err
 	}
-	serverInfo, err := auth.GetServerInfo(ctx, sc, z.EnableEncryptParam)
+	serverInfo, err := auth.GetServerInfo(ctx, sc, z.enableEncryptParam)
 	if err != nil {
 		return nil, err
 	}
@@ -105,26 +107,20 @@ func (z *zalo) loginCookie(ctx context.Context, sc *session.Context, cred Creden
 		return nil, errs.NewZCAError("login failed", "Login", nil)
 	}
 
-	sc.SecretKey = loginInfo.ZPWEnk
-	sc.UID = loginInfo.UID
+	sc.SealLogin(session.Seal{
+		UID:       loginInfo.UID,
+		IMEI:      cred.Imei,
+		UserAgent: cred.UserAgent,
+		Language:  lang,
+		SecretKey: loginInfo.ZPWEnk,
+		LoginInfo: loginInfo,
+		Settings:  serverInfo.Settings,
+		ExtraVer:  serverInfo.ExtraVer,
+	})
 
-	// if settings, ok := serverInfo["settings"].(map[string]any); ok {
-	// 	sc.Settings = settings
-	// } else if settings, ok := serverInfo["setttings"].(map[string]any); ok {
-	// 	sc.Settings = settings
-	// } else {
-	// 	return nil, errs.NewZCAError("missing settings", "Login", nil)
-	// }
+	httpx.Logger(sc).Info("Logged in as ", sc.UID())
 
-	// if extraVer, ok := serverInfo["extra_ver"].(string); ok {
-	// 	sc.ExtraVer = extraVer
-	// }
-
-	sc.LoginInfo = loginInfo
-
-	httpx.Logger(sc).Info("Logged in as ", loginInfo.UID)
-
-	return NewAPI(sc), nil
+	return api.New(sc), nil
 }
 
 func (z *zalo) parseCookies(cookie CookieUnion) http.CookieJar {

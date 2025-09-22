@@ -11,7 +11,7 @@ import (
 )
 
 func MakeURL(
-	ctx *session.Context,
+	sc session.Context,
 	baseURL string,
 	params map[string]interface{},
 	includeDefaults bool,
@@ -30,10 +30,10 @@ func MakeURL(
 
 	if includeDefaults {
 		if !query.Has("zpw_ver") {
-			query.Set("zpw_ver", fmt.Sprintf("%v", ctx.APIVersion))
+			query.Set("zpw_ver", fmt.Sprintf("%v", sc.APIVersion()))
 		}
 		if !query.Has("zpw_type") {
-			query.Set("zpw_type", fmt.Sprintf("%v", ctx.APIType))
+			query.Set("zpw_type", fmt.Sprintf("%v", sc.APIType()))
 		}
 	}
 

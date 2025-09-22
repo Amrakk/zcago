@@ -31,7 +31,12 @@ type EncryptParamResult struct {
 	Enk    *string
 }
 
-func Login(ctx context.Context, sc *session.Context, encryptParams bool) (*session.LoginInfo, error) {
+type ServerInfo struct {
+	Settings *session.Settings `json:"settings"`
+	ExtraVer *session.ExtraVer `json:"extra_ver"`
+}
+
+func Login(ctx context.Context, sc session.MutableContext, encryptParams bool) (*session.LoginInfo, error) {
 	encryptedParams, err := getEncryptParam(sc, encryptParams, "getlogininfo")
 	if err != nil {
 		return nil, err
@@ -47,7 +52,13 @@ func Login(ctx context.Context, sc *session.Context, encryptParams bool) (*sessi
 	u, _ := httpx.MakeURL(sc, "https://wpa.chat.zalo.me/api/login/getLoginInfo", params, true)
 	response, err := httpx.Request(ctx, sc, u, nil, false)
 	if err != nil {
-		return nil, errs.NewZCAError("Failed to fetch server info: "+response.Status, "GetServerInfo", &err)
+		var status string
+		if response != nil {
+			status = response.Status
+		} else {
+			status = "no response"
+		}
+		return nil, errs.NewZCAError("Failed to fetch server info: "+status, "GetServerInfo", &err)
 	}
 
 	defer response.Body.Close()
@@ -65,7 +76,7 @@ func Login(ctx context.Context, sc *session.Context, encryptParams bool) (*sessi
 		return nil, errs.NewZCAError("Failed to read getLoginInfo response", "Login", &readErr)
 	}
 
-	var data map[string]any
+	var data httpx.EncryptedResponse
 	if err := json.Unmarshal(raw, &data); err != nil {
 		httpx.Logger(sc).Error("Login: JSON unmarshal error: ", err)
 		return nil, errs.NewZCAError("Failed to decode getLoginInfo response: "+response.Status, "Login", &err)
@@ -75,37 +86,20 @@ func Login(ctx context.Context, sc *session.Context, encryptParams bool) (*sessi
 		return nil, nil
 	}
 
-	dataStr, ok := data["data"].(string)
-	if !ok {
+	dataStr := data.Data
+	if dataStr == nil {
 		return nil, errs.NewZCAError("Invalid data format in response", "Login", nil)
 	}
 
-	decryptedData, err := decryptResp(*encryptedParams.Enk, dataStr)
+	decryptedData, err := decryptResp(encryptedParams.Enk, dataStr)
 	if err != nil {
 		return nil, errs.NewZCAError("Failed to decrypt response data", "Login", &err)
 	}
-	if decryptedData == nil {
-		return nil, nil
-	}
 
-	if err != nil {
-		return nil, errs.NewZCAError("Failed to re-encode decrypted data", "Login", &err)
-	}
-
-	test, ok := (*decryptedData)["data"].(map[string]any)
-	if !ok {
-		return nil, errs.NewZCAError("Invalid decrypted data format", "Login", nil)
-	}
-
-	raw, err = json.Marshal(test)
-	var loginInfo session.LoginInfo
-	if err := json.Unmarshal([]byte(raw), &loginInfo); err != nil {
-		return nil, errs.NewZCAError("Failed to unmarshal login info", "Login", &err)
-	}
-	return &loginInfo, nil
+	return decryptedData.Data, nil
 }
 
-func GetServerInfo(ctx context.Context, sc *session.Context, encryptParams bool) (map[string]any, error) {
+func GetServerInfo(ctx context.Context, sc session.MutableContext, encryptParams bool) (*ServerInfo, error) {
 	encryptedParams, err := getEncryptParam(sc, encryptParams, "getserverinfo")
 	if err != nil {
 		return nil, err
@@ -118,9 +112,9 @@ func GetServerInfo(ctx context.Context, sc *session.Context, encryptParams bool)
 
 	params := map[string]any{
 		"signkey":        signkey,
-		"imei":           sc.IMEI,
-		"type":           sc.APIType,
-		"client_version": sc.APIVersion,
+		"imei":           sc.IMEI(),
+		"type":           sc.APIType(),
+		"client_version": sc.APIVersion(),
 		"computer_name":  "Web",
 	}
 
@@ -145,25 +139,21 @@ func GetServerInfo(ctx context.Context, sc *session.Context, encryptParams bool)
 		return nil, errs.NewZCAError("Failed to read getLoginInfo response", "Login", &readErr)
 	}
 
-	var data map[string]any
+	var data httpx.BaseResponse[ServerInfo]
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return nil, errs.NewZCAError("Failed to decode server info response: "+response.Status, "GetServerInfo", &err)
 	}
 
-	if data["data"] == nil {
-		return nil, errs.NewZCAError("Failed to fetch server info: "+data["error_message"].(string), "GetServerInfo", nil)
-	}
-
-	return data["data"].(map[string]any), nil
+	return data.Data, nil
 }
 
-func getEncryptParam(sc *session.Context, encryptParams bool, typeStr string) (*EncryptParamResult, error) {
+func getEncryptParam(sc session.Context, encryptParams bool, typeStr string) (*EncryptParamResult, error) {
 	params := make(map[string]any, 8)
 
 	data := map[string]any{
 		"computer_name": "Web",
-		"imei":          sc.IMEI,
-		"language":      sc.Language,
+		"imei":          sc.IMEI(),
+		"language":      sc.Language(),
 		"ts":            time.Now().UnixNano() / int64(time.Millisecond),
 	}
 
@@ -188,9 +178,9 @@ func getEncryptParam(sc *session.Context, encryptParams bool, typeStr string) (*
 
 	if typeStr == "getserverinfo" {
 		params["signkey"] = httpx.GetSignKey(typeStr, map[string]any{
-			"imei":           sc.IMEI,
-			"type":           sc.APIType,
-			"client_version": sc.APIVersion,
+			"imei":           sc.IMEI(),
+			"type":           sc.APIType(),
+			"client_version": sc.APIVersion(),
 			"computer_name":  "Web",
 		})
 	} else {
@@ -209,11 +199,11 @@ func getEncryptParam(sc *session.Context, encryptParams bool, typeStr string) (*
 	}, nil
 }
 
-func encryptParam(sc *session.Context, data map[string]any, encryptParams bool) (*EncryptedPayload, error) {
+func encryptParam(sc session.Context, data map[string]any, encryptParams bool) (*EncryptedPayload, error) {
 	if encryptParams {
 		enc, err := httpx.NewParamsEncryptor(
-			sc.APIType,
-			sc.IMEI,
+			sc.APIType(),
+			sc.IMEI(),
 			uint(time.Now().UnixNano()/int64(time.Millisecond)),
 		)
 		if err != nil {
@@ -250,18 +240,22 @@ func encryptParam(sc *session.Context, data map[string]any, encryptParams bool) 
 	return nil, nil
 }
 
-func decryptResp(key, data string) (*map[string]any, error) {
-	u, err := url.PathUnescape(data)
+func decryptResp(key, data *string) (*httpx.BaseResponse[session.LoginInfo], error) {
+	if key == nil || data == nil {
+		return nil, errs.NewZCAError("key or data is nil", "decryptResp", nil)
+	}
+
+	u, err := url.PathUnescape(*data)
 	if err != nil {
 		return nil, err
 	}
 
-	plain, err := cryptox.DecodeAES([]byte(key), u)
+	plain, err := cryptox.DecodeAES([]byte(*key), u)
 	if err != nil {
 		return nil, err
 	}
 
-	var obj map[string]any
+	var obj httpx.BaseResponse[session.LoginInfo]
 	if err := json.Unmarshal([]byte(plain), &obj); err != nil {
 		return nil, err
 	}
