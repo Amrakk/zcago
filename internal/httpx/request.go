@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -65,6 +66,8 @@ func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt 
 
 func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool, depth int) (*http.Response, error) {
 	if depth > maxRedirects {
+		logger.Log(sc).Warn("Too many redirects, aborting request").
+			Debug("Max redirects exceeded:", maxRedirects)
 		return nil, errs.NewZCAError("too many redirects", "request", nil)
 	}
 
@@ -112,11 +115,13 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 	// Persist cookies from Set-Cookie (domain-aware), only when not raw
 	if !raw {
 		if err := persistSetCookies(sc.CookieJar(), resp, origin); err != nil {
-			Logger(sc).Warn("failed to persist cookies")
+			logger.Log(sc).Warn("Failed to persist cookies:", err)
 		}
 	}
 
 	if loc := resp.Header.Get("Location"); loc != "" {
+		logger.Log(sc).Debug("Following redirect to:", loc).
+			Verbose("Redirect depth:", depth+1)
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 

@@ -22,6 +22,7 @@ type Context interface {
 
 	Options() OptionsSnapshot
 	IsLogging() bool
+	LogLevel() uint8
 	Client() *http.Client
 	CheckUpdate() bool
 
@@ -62,6 +63,7 @@ type OptionsSnapshot struct {
 	SelfListen          bool
 	CheckUpdate         bool
 	Logging             bool
+	LogLevel            uint8
 	APIType             uint
 	APIVersion          uint
 	Client              *http.Client
@@ -120,6 +122,7 @@ func NewContext(optFns ...Option) *contextImpl {
 			SelfListen:          cfg.selfListen,
 			CheckUpdate:         cfg.checkUpdate,
 			Logging:             cfg.logging,
+			LogLevel:            cfg.logLevel,
 			APIType:             cfg.apiType,
 			APIVersion:          cfg.apiVersion,
 			Client:              cfg.client,
@@ -217,6 +220,7 @@ func (c *contextImpl) APIVersion() uint         { return c.apiVersion }
 func (c *contextImpl) Options() OptionsSnapshot { return c.opts }
 func (c *contextImpl) Client() *http.Client     { return c.opts.Client }
 func (c *contextImpl) IsLogging() bool          { return c.opts.Logging }
+func (c *contextImpl) LogLevel() uint8          { return c.opts.LogLevel }
 func (c *contextImpl) CheckUpdate() bool        { return c.opts.CheckUpdate }
 
 func (c *contextImpl) Cookies(domains ...string) []*http.Cookie {

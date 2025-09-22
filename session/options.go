@@ -10,6 +10,7 @@ type options struct {
 	selfListen  bool
 	checkUpdate bool
 	logging     bool
+	logLevel    uint8
 	apiType     uint
 	apiVersion  uint
 
@@ -27,6 +28,10 @@ func WithCheckUpdate(v bool) Option {
 }
 func WithLogging(v bool) Option {
 	return func(o *options) { o.logging = v }
+}
+
+func WithLogLevel(level uint8) Option {
+	return func(o *options) { o.logLevel = level }
 }
 func WithAPIType(t uint) Option {
 	return func(o *options) {
@@ -54,6 +59,7 @@ func defaultOptions() options {
 		selfListen:  false,
 		checkUpdate: true,
 		logging:     true,
+		logLevel:    1, // Debug level by default
 		apiType:     30,
 		apiVersion:  665,
 	}

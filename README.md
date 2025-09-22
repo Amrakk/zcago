@@ -1,4 +1,4 @@
-# ZCA-GO
+# ZCAGO
 
 > [!NOTE]
 > This is an unofficial Zalo API for personal account. It work by simulating the browser to interact with Zalo Web.

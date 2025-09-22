@@ -8,7 +8,7 @@ import (
 
 	"github.com/Amrakk/zcago/api"
 	"github.com/Amrakk/zcago/internal/errs"
-	"github.com/Amrakk/zcago/internal/httpx"
+	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 	"github.com/Amrakk/zcago/session/auth"
 	"github.com/Amrakk/zcago/version"
@@ -34,7 +34,8 @@ func NewZalo(opts ...Option) Zalo {
 }
 
 func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
-	appCtx := session.NewContext(toSessionOptions(z.opts...)...)
+	sessionOpts := toSessionOptions(z.opts...)
+	appCtx := session.NewContext(sessionOpts...)
 
 	return z.loginCookie(ctx, appCtx, cred)
 }
@@ -95,16 +96,18 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 
 	loginInfo, err := auth.Login(ctx, sc, z.enableEncryptParam)
 	if err != nil {
-		httpx.Logger(sc).Error("Login failed", err)
+		logger.Log(sc).Error("Login failed", err)
 		return nil, err
 	}
 	serverInfo, err := auth.GetServerInfo(ctx, sc, z.enableEncryptParam)
 	if err != nil {
+		logger.Log(sc).Error("Failed to get server info:", err)
 		return nil, err
 	}
 
 	if loginInfo == nil || serverInfo == nil {
-		return nil, errs.NewZCAError("login failed", "Login", nil)
+		logger.Log(sc).Error("Login or server info is empty")
+		return nil, errs.NewZCAError("Login failed", "Login", nil)
 	}
 
 	sc.SealLogin(session.Seal{
@@ -118,8 +121,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 		ExtraVer:  serverInfo.ExtraVer,
 	})
 
-	httpx.Logger(sc).Info("Logged in as ", sc.UID())
-
+	logger.Log(sc).Success("Successfully logged in as", sc.UID())
 	return api.New(sc), nil
 }
 

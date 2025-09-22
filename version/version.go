@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/Amrakk/zcago/internal/httpx"
+	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -28,6 +28,30 @@ type response struct {
 
 func GetVersion() string {
 	return version
+}
+
+func CheckUpdate(sc session.Context) {
+	if !sc.CheckUpdate() {
+		return
+	}
+
+	info := getVersionInfo()
+	if info.Version == "" {
+		logger.Log(sc).Debug("No version information available from registry")
+		return
+	}
+
+	if semver.IsValid(version) && semver.IsValid(info.Version) {
+		if semver.Compare(info.Version, version) > 0 {
+			logger.Log(sc).Infof("A new version of zcago is available: %s → %s (released %s)", version, info.Version, info.Time)
+		} else {
+			logger.Log(sc).Info("zcago is up to date")
+		}
+	} else {
+		logger.Log(sc).Warn("Invalid version format detected").
+			Debug("Current version valid:", semver.IsValid(version)).
+			Debug("Registry version valid:", semver.IsValid(info.Version))
+	}
 }
 
 func getVersionInfo() response {
@@ -55,23 +79,4 @@ func getVersionInfo() response {
 		return response{}
 	}
 	return r
-}
-
-func CheckUpdate(sc session.Context) {
-	if !sc.CheckUpdate() {
-		return
-	}
-
-	info := getVersionInfo()
-	if info.Version == "" {
-		return
-	}
-
-	if semver.IsValid(version) && semver.IsValid(info.Version) {
-		if semver.Compare(info.Version, version) > 0 {
-			httpx.Logger(sc).Infof("zcago: update available: %s → %s (released %s)\n", version, info.Version, info.Time)
-		} else {
-			httpx.Logger(sc).Info("zcago: up to date\n")
-		}
-	}
 }

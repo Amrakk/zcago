@@ -10,6 +10,7 @@ import (
 	"github.com/Amrakk/zcago/internal/cryptox"
 	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
+	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -39,6 +40,7 @@ type ServerInfo struct {
 func Login(ctx context.Context, sc session.MutableContext, encryptParams bool) (*session.LoginInfo, error) {
 	encryptedParams, err := getEncryptParam(sc, encryptParams, "getlogininfo")
 	if err != nil {
+		logger.Log(sc).Error("Failed to generate encrypted parameters:", err)
 		return nil, err
 	}
 
@@ -52,11 +54,9 @@ func Login(ctx context.Context, sc session.MutableContext, encryptParams bool) (
 	u, _ := httpx.MakeURL(sc, "https://wpa.chat.zalo.me/api/login/getLoginInfo", params, true)
 	response, err := httpx.Request(ctx, sc, u, nil, false)
 	if err != nil {
-		var status string
+		status := "no response"
 		if response != nil {
 			status = response.Status
-		} else {
-			status = "no response"
 		}
 		return nil, errs.NewZCAError("Failed to fetch server info: "+status, "GetServerInfo", &err)
 	}
@@ -65,20 +65,21 @@ func Login(ctx context.Context, sc session.MutableContext, encryptParams bool) (
 
 	body, err := httpx.DecodeBody(response)
 	if err != nil {
-		httpx.Logger(sc).Error("Login: failed decoding response body: ", err)
+		logger.Log(sc).Error("Failed to decode login response body:", err)
 		return nil, errs.NewZCAError("Failed to decode getLoginInfo response", "Login", &err)
 	}
 	defer body.Close()
 
 	raw, readErr := io.ReadAll(body)
 	if readErr != nil {
-		httpx.Logger(sc).Error("Login: failed reading response body: ", readErr)
+		logger.Log(sc).Error("Failed to read login response:", readErr)
 		return nil, errs.NewZCAError("Failed to read getLoginInfo response", "Login", &readErr)
 	}
 
 	var data httpx.EncryptedResponse
 	if err := json.Unmarshal(raw, &data); err != nil {
-		httpx.Logger(sc).Error("Login: JSON unmarshal error: ", err)
+		logger.Log(sc).Error("Failed to parse login response JSON:", err).
+			Debug("Raw response:", string(raw))
 		return nil, errs.NewZCAError("Failed to decode getLoginInfo response: "+response.Status, "Login", &err)
 	}
 
@@ -102,11 +103,13 @@ func Login(ctx context.Context, sc session.MutableContext, encryptParams bool) (
 func GetServerInfo(ctx context.Context, sc session.MutableContext, encryptParams bool) (*ServerInfo, error) {
 	encryptedParams, err := getEncryptParam(sc, encryptParams, "getserverinfo")
 	if err != nil {
+		logger.Log(sc).Error("Failed to generate encrypted parameters for server info:", err)
 		return nil, err
 	}
 
 	signkey, ok := encryptedParams.Params["signkey"].(string)
 	if !ok || signkey == "" {
+		logger.Log(sc).Error("Missing signkey in encrypted parameters")
 		return nil, errs.NewZCAError("missing signkey", "GetServerInfo", nil)
 	}
 
@@ -127,7 +130,7 @@ func GetServerInfo(ctx context.Context, sc session.MutableContext, encryptParams
 
 	body, err := httpx.DecodeBody(response)
 	if err != nil {
-		httpx.Logger(sc).Error("Login: failed decoding response body: ", err)
+		logger.Log(sc).Error("Failed to decode server info response body:", err)
 		return nil, errs.NewZCAError("Failed to decode getLoginInfo response", "Login", &err)
 	}
 	defer body.Close()
@@ -135,7 +138,7 @@ func GetServerInfo(ctx context.Context, sc session.MutableContext, encryptParams
 	defer response.Body.Close()
 	raw, readErr := io.ReadAll(body)
 	if readErr != nil {
-		httpx.Logger(sc).Error("Login: failed reading response body: ", readErr)
+		logger.Log(sc).Error("Failed to read server info response:", readErr)
 		return nil, errs.NewZCAError("Failed to read getLoginInfo response", "Login", &readErr)
 	}
 
