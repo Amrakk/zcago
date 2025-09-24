@@ -6,12 +6,14 @@
         "bgavatar",
         "cryptox",
         "deactive",
+        "errgroup",
         "giphy",
         "haspcclient",
         "httpx",
         "jsonx",
         "PKCS",
         "sdob",
+        "setttings",
         "signkey",
         "strcase",
         "strx",
@@ -22,6 +24,4 @@
         "zimsg",
         "zmodel"
     ],
-    "git.decorations.enabled": true,
-    "scm.diffDecorationsGutterVisibility": "always"
 }

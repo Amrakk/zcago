@@ -6,6 +6,17 @@ import (
 
 type Option func(*options)
 
+type OptionsSnapshot struct {
+	SelfListen          bool
+	CheckUpdate         bool
+	Logging             bool
+	LogLevel            uint8
+	APIType             uint
+	APIVersion          uint
+	Client              *http.Client
+	ImageMetadataGetter ImageMetadataGetter
+}
+
 type options struct {
 	selfListen  bool
 	checkUpdate bool
@@ -22,14 +33,12 @@ type options struct {
 func WithSelfListen(v bool) Option {
 	return func(o *options) { o.selfListen = v }
 }
-
 func WithCheckUpdate(v bool) Option {
 	return func(o *options) { o.checkUpdate = v }
 }
 func WithLogging(v bool) Option {
 	return func(o *options) { o.logging = v }
 }
-
 func WithLogLevel(level uint8) Option {
 	return func(o *options) { o.logLevel = level }
 }
@@ -62,6 +71,7 @@ func defaultOptions() options {
 		logLevel:    1, // Debug level by default
 		apiType:     30,
 		apiVersion:  665,
+		client:      http.DefaultClient,
 	}
 }
 

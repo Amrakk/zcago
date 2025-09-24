@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"golang.org/x/mod/semver"
 
@@ -30,12 +29,12 @@ func GetVersion() string {
 	return version
 }
 
-func CheckUpdate(sc session.Context) {
+func CheckUpdate(ctx context.Context, sc session.Context) {
 	if !sc.CheckUpdate() {
 		return
 	}
 
-	info := getVersionInfo()
+	info := getVersionInfo(ctx)
 	if info.Version == "" {
 		logger.Log(sc).Debug("No version information available from registry")
 		return
@@ -54,11 +53,8 @@ func CheckUpdate(sc session.Context) {
 	}
 }
 
-func getVersionInfo() response {
-	reqCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, registry, nil)
+func getVersionInfo(ctx context.Context) response {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, registry, nil)
 	if err != nil {
 		return response{}
 	}

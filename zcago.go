@@ -6,6 +6,8 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/Amrakk/zcago/api"
 	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/logger"
@@ -81,31 +83,53 @@ func (z *zalo) LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallb
 }
 
 func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred Credentials) (API, error) {
-	version.CheckUpdate(sc)
-	z.validateParams(cred)
-
 	lang := "vi"
 	if cred.Language != nil && *cred.Language != "" {
 		lang = *cred.Language
 	}
-
 	sc.SetIMEI(cred.Imei)
 	sc.SetLanguage(lang)
 	sc.SetUserAgent(cred.UserAgent)
 	sc.SetCookieJar(z.parseCookies(cred.Cookie))
 
-	loginInfo, err := auth.Login(ctx, sc, z.enableEncryptParam)
-	if err != nil {
-		logger.Log(sc).Error("Login failed", err)
-		return nil, err
-	}
-	serverInfo, err := auth.GetServerInfo(ctx, sc, z.enableEncryptParam)
-	if err != nil {
-		logger.Log(sc).Error("Failed to get server info:", err)
-		return nil, err
-	}
+	var (
+		loginInfo  *session.LoginInfo
+		serverInfo *session.ServerInfo
+	)
 
-	if loginInfo == nil || serverInfo == nil {
+	g, gctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		defer func() { _ = recover() }()
+		version.CheckUpdate(gctx, sc)
+		return nil
+	})
+
+	g.Go(func() error {
+		z.validateParams(cred)
+		li, err := auth.Login(gctx, sc, z.enableEncryptParam)
+		if err != nil {
+			logger.Log(sc).Error("Login failed", err)
+			return err
+		}
+		loginInfo = li
+		return nil
+	})
+
+	g.Go(func() error {
+		si, err := auth.GetServerInfo(gctx, sc, z.enableEncryptParam)
+		if err != nil {
+			logger.Log(sc).Error("Failed to get server info:", err)
+			return err
+		}
+		serverInfo = si
+		return nil
+	})
+
+	if err := g.Wait(); err != nil || loginInfo == nil || serverInfo == nil {
+		if err != nil {
+			return nil, err
+		}
 		logger.Log(sc).Error("Login or server info is empty")
 		return nil, errs.NewZCAError("Login failed", "Login", nil)
 	}
@@ -121,7 +145,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 		ExtraVer:  serverInfo.ExtraVer,
 	})
 
-	logger.Log(sc).Success("Successfully logged in as", sc.UID())
+	logger.Log(sc).Success("Successfully logged in as ", sc.UID())
 	return api.New(sc), nil
 }
 

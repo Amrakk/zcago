@@ -37,15 +37,15 @@ func EncodeAES(key []byte, data string, encType EncryptType) (string, error) {
 	}
 }
 
-func DecodeAES(key []byte, data string) (string, error) {
+func DecodeAES(key []byte, data string) ([]byte, error) {
 	ciphertext, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	iv := make([]byte, aes.BlockSize)
@@ -54,7 +54,7 @@ func DecodeAES(key []byte, data string) (string, error) {
 	plain, err = Pkcs7Unpadding(plain, aes.BlockSize)
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return string(plain), nil
+	return plain, nil
 }

@@ -1,0 +1,5 @@
+-   Implement get acc profile
+-   Implement WS:
+    -   WS Conn (github.com/coder/websocket)
+    -   Implement EventEmitter alike
+-   Custom cookiejar (maybe not)
