@@ -11,8 +11,10 @@ import (
 	"github.com/Amrakk/zcago/session"
 )
 
-const version = "v0.0.1"
-const registry = "https://proxy.golang.org/github.com/amrakk/zcago/@latest"
+const (
+	version  = "v0.0.1"
+	registry = "https://proxy.golang.org/github.com/amrakk/zcago/@latest"
+)
 
 type response struct {
 	Version string

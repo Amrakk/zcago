@@ -24,4 +24,9 @@
         "zimsg",
         "zmodel"
     ],
+    
+    "go.formatTool": "gofumpt",
+    "gopls": {
+        "formatting.gofumpt": true
+    }
 }

@@ -59,10 +59,10 @@ func MakeURL(
 	baseURL string,
 	params map[string]interface{},
 	includeDefaults bool,
-) (string, error) {
+) string {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return "", err
+		return ""
 	}
 
 	query := u.Query()
@@ -82,7 +82,7 @@ func MakeURL(
 	}
 
 	u.RawQuery = query.Encode()
-	return u.String(), nil
+	return u.String()
 }
 
 func SignZaloURL(baseURL string, apiType string, params map[string]interface{}) string {

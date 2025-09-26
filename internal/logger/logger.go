@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Amrakk/zcago/session"
 )
 
 type Level uint8
@@ -18,63 +20,70 @@ const (
 	Success
 )
 
-type SessionContext interface {
-	IsLogging() bool
-	LogLevel() uint8
-}
-
-type logChain struct {
+type Logger struct {
 	enabled  bool
 	minLevel Level
 }
 
-func Log(sc SessionContext) *logChain {
-	return &logChain{
+func Log(sc session.Context) *Logger {
+	return &Logger{
 		enabled:  sc.IsLogging(),
 		minLevel: Level(sc.LogLevel()),
 	}
 }
 
-func (c *logChain) SetLevel(l Level) *logChain { c.minLevel = l; return c }
-func (c *logChain) Enable(b bool) *logChain    { c.enabled = b; return c }
+func (c *Logger) SetLevel(l Level) *Logger { c.minLevel = l; return c }
+func (c *Logger) Enable(b bool) *Logger    { c.enabled = b; return c }
 
-func (c *logChain) Verbose(v ...any) *logChain {
+func (c *Logger) Verbose(v ...any) *Logger {
 	return c.log(Verbose, "VERBOSE", colorMagenta, fmt.Sprint(v...))
 }
-func (c *logChain) Debug(v ...any) *logChain {
+
+func (c *Logger) Debug(v ...any) *Logger {
 	return c.log(Debug, "DEBUG", colorCyan, fmt.Sprint(v...))
 }
-func (c *logChain) Info(v ...any) *logChain { return c.log(Info, "INFO", colorBlue, fmt.Sprint(v...)) }
-func (c *logChain) Warn(v ...any) *logChain {
+
+func (c *Logger) Info(v ...any) *Logger {
+	return c.log(Info, "INFO", colorBlue, fmt.Sprint(v...))
+}
+
+func (c *Logger) Warn(v ...any) *Logger {
 	return c.log(Warn, "WARN", colorYellow, fmt.Sprint(v...))
 }
-func (c *logChain) Error(v ...any) *logChain {
+
+func (c *Logger) Error(v ...any) *Logger {
 	return c.log(Error, "ERROR", colorRed, fmt.Sprint(v...))
 }
-func (c *logChain) Success(v ...any) *logChain {
+
+func (c *Logger) Success(v ...any) *Logger {
 	return c.log(Success, "SUCCESS", colorGreen, fmt.Sprint(v...))
 }
 
-func (c *logChain) Verbosef(f string, a ...any) *logChain {
+func (c *Logger) Verbosef(f string, a ...any) *Logger {
 	return c.log(Verbose, "VERBOSE", colorMagenta, fmt.Sprintf(f, a...))
 }
-func (c *logChain) Debugf(f string, a ...any) *logChain {
+
+func (c *Logger) Debugf(f string, a ...any) *Logger {
 	return c.log(Debug, "DEBUG", colorCyan, fmt.Sprintf(f, a...))
 }
-func (c *logChain) Infof(f string, a ...any) *logChain {
+
+func (c *Logger) Infof(f string, a ...any) *Logger {
 	return c.log(Info, "INFO", colorBlue, fmt.Sprintf(f, a...))
 }
-func (c *logChain) Warnf(f string, a ...any) *logChain {
+
+func (c *Logger) Warnf(f string, a ...any) *Logger {
 	return c.log(Warn, "WARN", colorYellow, fmt.Sprintf(f, a...))
 }
-func (c *logChain) Errorf(f string, a ...any) *logChain {
+
+func (c *Logger) Errorf(f string, a ...any) *Logger {
 	return c.log(Error, "ERROR", colorRed, fmt.Sprintf(f, a...))
 }
-func (c *logChain) Successf(f string, a ...any) *logChain {
+
+func (c *Logger) Successf(f string, a ...any) *Logger {
 	return c.log(Success, "SUCCESS", colorGreen, fmt.Sprintf(f, a...))
 }
 
-func (c *logChain) log(lvl Level, tag, col string, msg string) *logChain {
+func (c *Logger) log(lvl Level, tag, col string, msg string) *Logger {
 	if !c.enabled || lvl < c.minLevel {
 		return c
 	}
@@ -94,7 +103,9 @@ func (c *logChain) log(lvl Level, tag, col string, msg string) *logChain {
 	// message
 	b.WriteString(msg)
 
-	fmt.Fprintln(os.Stdout, b.String())
+	if _, err := fmt.Fprintln(os.Stdout, b.String()); err != nil {
+		fmt.Println("logger: failed to write log:", err)
+	}
 	return c
 }
 

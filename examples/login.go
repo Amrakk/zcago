@@ -10,60 +10,88 @@ import (
 	"github.com/Amrakk/zcago"
 )
 
-var credPath = filepath.Join(projectRoot(), "examples", "credentials.json")
+type App struct {
+	zalo     zcago.Zalo
+	credPath string
+}
 
 func main() {
-	ctx := context.Background()
-	zalo := zcago.NewZalo(nil)
-	cred := loadCredentials()
+	app := &App{
+		zalo:     zcago.NewZalo(),
+		credPath: filepath.Join(rootDir(), "examples", "credentials.json"),
+	}
 
-	var (
-		api zcago.API
-		err error
-	)
+	ctx := context.Background()
+	if err := app.run(ctx); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func (a *App) run(ctx context.Context) error {
+	api, err := a.authenticate(ctx)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	return a.displayAccountInfo(ctx, api)
+}
+
+func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
+	cred := a.loadCredentials()
+
+	var api zcago.API
+	var err error
 
 	if isValidCredentials(cred) {
-		api, err = zalo.Login(ctx, *cred)
+		api, err = a.zalo.Login(ctx, *cred)
 	} else {
-		api, err = zalo.LoginQR(ctx, nil, nil)
-	}
-	if err != nil {
-		fmt.Println("login failed:", err)
-		return
-	}
-
-	if cred == nil {
-		if err := storeCredentials(ctx, api); err != nil {
-			fmt.Println("save credentials failed:", err)
-			return
+		api, err = a.zalo.LoginQR(ctx, nil, nil)
+		if err == nil && cred == nil {
+			if storeErr := a.storeCredentials(api); storeErr != nil {
+				fmt.Printf("Warning: failed to save credentials: %v\n", storeErr)
+			}
 		}
 	}
+
+	return api, err
 }
 
-func isValidCredentials(c *zcago.Credentials) bool {
-	return c != nil && len(c.Imei) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
+func (a *App) displayAccountInfo(ctx context.Context, api zcago.API) error {
+	info, err := api.FetchAccountInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("fetch account info failed: %w", err)
+	}
+
+	data, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal account info failed: %w", err)
+	}
+
+	fmt.Println("Account Info:", string(data))
+	return nil
 }
 
-func loadCredentials() *zcago.Credentials {
-	if _, err := os.Stat(credPath); os.IsNotExist(err) {
+func (a *App) loadCredentials() *zcago.Credentials {
+	if _, err := os.Stat(a.credPath); os.IsNotExist(err) {
 		return nil
 	}
-	raw, err := os.ReadFile(credPath)
+	raw, err := os.ReadFile(a.credPath)
 	if err != nil {
-		fmt.Println("read credentials failed:", err)
+		fmt.Printf("Warning: read credentials failed: %v\n", err)
 		return nil
 	}
 
 	var c zcago.Credentials
 	if err := json.Unmarshal(raw, &c); err != nil {
-		fmt.Println("parse credentials failed:", err)
+		fmt.Printf("Warning: parse credentials failed: %v\n", err)
 		return nil
 	}
 	return &c
 }
 
-func storeCredentials(ctx context.Context, api zcago.API) error {
-	sc, err := api.GetContext(ctx)
+func (a *App) storeCredentials(api zcago.API) error {
+	sc, err := api.GetContext()
 	if err != nil {
 		return fmt.Errorf("get context failed: %w", err)
 	}
@@ -77,15 +105,19 @@ func storeCredentials(ctx context.Context, api zcago.API) error {
 		return fmt.Errorf("marshal credentials failed: %w", err)
 	}
 
-	if err := os.WriteFile(credPath, data, 0644); err != nil {
+	if err := os.WriteFile(a.credPath, data, 0o600); err != nil {
 		return fmt.Errorf("write credentials failed: %w", err)
 	}
 
-	fmt.Println("Saved credentials to", credPath)
+	fmt.Println("Saved credentials to", a.credPath)
 	return nil
 }
 
-func projectRoot() string {
+func isValidCredentials(c *zcago.Credentials) bool {
+	return c != nil && len(c.Imei) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
+}
+
+func rootDir() string {
 	wd, err := os.Getwd()
 	if err != nil {
 		fmt.Println("get working dir failed:", err)

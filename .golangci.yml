@@ -2,6 +2,15 @@ version: "2"
 
 linters:
   default: standard
+  exclusions:
+    warn-unused: true
+    rules:
+      - linters: [gosec]
+        text: "G401: Use of weak cryptographic primitive"
+        # justification: "MD5 required by zalo"
+      - linters: [gosec]
+        text: "G501: Blocklisted import crypto/md5: weak cryptographic primitive"
+        # justification: "MD5 required by zalo"
   enable:
     - cyclop
     - gocritic
@@ -12,8 +21,16 @@ linters:
     - unconvert
     - unparam
     - whitespace
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (net.Conn).Close
+  
+
 
 formatters:
   enable:
     - gofumpt
     - goimports
+

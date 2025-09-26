@@ -83,6 +83,10 @@ func (z *zalo) LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallb
 }
 
 func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred Credentials) (API, error) {
+	if err := z.validateParams(cred); err != nil {
+		return nil, err
+	}
+
 	lang := "vi"
 	if cred.Language != nil && *cred.Language != "" {
 		lang = *cred.Language
@@ -106,7 +110,6 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	})
 
 	g.Go(func() error {
-		z.validateParams(cred)
 		li, err := auth.Login(gctx, sc, z.enableEncryptParam)
 		if err != nil {
 			logger.Log(sc).Error("Login failed", err)
@@ -134,19 +137,21 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 		return nil, errs.NewZCAError("Login failed", "Login", nil)
 	}
 
+	secretKey := session.SecretKey(loginInfo.ZPWEnk)
+
 	sc.SealLogin(session.Seal{
 		UID:       loginInfo.UID,
 		IMEI:      cred.Imei,
 		UserAgent: cred.UserAgent,
 		Language:  lang,
-		SecretKey: loginInfo.ZPWEnk,
+		SecretKey: secretKey,
 		LoginInfo: loginInfo,
 		Settings:  serverInfo.Settings,
 		ExtraVer:  serverInfo.ExtraVer,
 	})
 
 	logger.Log(sc).Success("Successfully logged in as ", sc.UID())
-	return api.New(sc), nil
+	return api.New(sc)
 }
 
 func (z *zalo) parseCookies(cookie CookieUnion) http.CookieJar {

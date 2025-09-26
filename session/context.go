@@ -29,13 +29,14 @@ type Context interface {
 	//
 	// All returned cookies are copies; modifying them does not affect the jar.
 	Cookies(domains ...string) []*http.Cookie
-	SecretKey() string
+	SecretKey() SecretKey
 	LoginInfo() *LoginInfo
 	Settings() *Settings
 	ExtraVer() *ExtraVer
 
-	ZPWServiceMap() *ZpwServiceMap
 	ZPWWebsocket() []string
+	ZPWServiceMap() *ZpwServiceMap
+	GetZpwService(service string) []string
 }
 
 type MutableContext interface {
@@ -56,9 +57,10 @@ type MutableContext interface {
 }
 
 func NewContext(optFns ...Option) MutableContext {
-	impl := newContextImpl(optFns...)
-	return impl
+	return newContextImpl(optFns...)
 }
 
-var _ Context = (*contextImpl)(nil)
-var _ MutableContext = (*contextImpl)(nil)
+var (
+	_ Context        = (*contextImpl)(nil)
+	_ MutableContext = (*contextImpl)(nil)
+)

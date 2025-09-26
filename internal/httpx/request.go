@@ -16,9 +16,18 @@ type RequestOptions struct {
 	Headers http.Header
 	Query   url.Values
 	Body    io.Reader
+	Raw     bool
 }
 
-func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool) (*http.Request, error) {
+func BuildFormBody(data map[string]string) io.Reader {
+	form := url.Values{}
+	for k, v := range data {
+		form.Set(k, v)
+	}
+	return strings.NewReader(form.Encode())
+}
+
+func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Request, error) {
 	origin := getOrigin(urlStr)
 	headers := http.Header{}
 
@@ -27,7 +36,7 @@ func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string,
 		method = opt.Method
 	}
 
-	if !raw {
+	if opt != nil && !opt.Raw {
 		def, err := getDefaultHeaders(sc, origin)
 		if err != nil {
 			return nil, err
@@ -64,10 +73,7 @@ func getDefaultHeaders(sc session.Context, origin string) (http.Header, error) {
 		return nil, errs.NewZCAError("user agent is not available", "context", nil)
 	}
 
-	cookieStr, err := cookieString(sc.Cookies(origin))
-	if err != nil {
-		return nil, err
-	}
+	cookieStr := cookieString(sc.Cookies(origin))
 
 	h := make(http.Header, 8)
 	h.Set("Accept", "application/json, text/plain, */*")
@@ -81,9 +87,9 @@ func getDefaultHeaders(sc session.Context, origin string) (http.Header, error) {
 	return h, nil
 }
 
-func cookieString(cookies []*http.Cookie) (string, error) {
+func cookieString(cookies []*http.Cookie) string {
 	if len(cookies) == 0 {
-		return "", nil
+		return ""
 	}
 	var b strings.Builder
 	for i, cookie := range cookies {
@@ -94,7 +100,7 @@ func cookieString(cookies []*http.Cookie) (string, error) {
 		b.WriteByte('=')
 		b.WriteString(cookie.Value)
 	}
-	return b.String(), nil
+	return b.String()
 }
 
 func mergeHeaders(dst, src http.Header) {
@@ -111,7 +117,7 @@ func mergeHeaders(dst, src http.Header) {
 func getOrigin(rawURL string) string {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return "https://xxxxxxxxx"
+		return ""
 	}
 	return (&url.URL{Scheme: u.Scheme, Host: u.Host}).String()
 }

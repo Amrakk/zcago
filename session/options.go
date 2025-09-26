@@ -30,18 +30,12 @@ type options struct {
 	imageMetadataGetter ImageMetadataGetter
 }
 
-func WithSelfListen(v bool) Option {
-	return func(o *options) { o.selfListen = v }
-}
-func WithCheckUpdate(v bool) Option {
-	return func(o *options) { o.checkUpdate = v }
-}
-func WithLogging(v bool) Option {
-	return func(o *options) { o.logging = v }
-}
-func WithLogLevel(level uint8) Option {
-	return func(o *options) { o.logLevel = level }
-}
+func WithSelfListen(v bool) Option         { return func(o *options) { o.selfListen = v } }
+func WithCheckUpdate(v bool) Option        { return func(o *options) { o.checkUpdate = v } }
+func WithLogging(v bool) Option            { return func(o *options) { o.logging = v } }
+func WithLogLevel(level uint8) Option      { return func(o *options) { o.logLevel = level } }
+func WithHTTPClient(c *http.Client) Option { return func(o *options) { o.client = c } }
+
 func WithAPIType(t uint) Option {
 	return func(o *options) {
 		if t != 0 {
@@ -49,6 +43,7 @@ func WithAPIType(t uint) Option {
 		}
 	}
 }
+
 func WithAPIVersion(v uint) Option {
 	return func(o *options) {
 		if v != 0 {
@@ -56,9 +51,7 @@ func WithAPIVersion(v uint) Option {
 		}
 	}
 }
-func WithHTTPClient(c *http.Client) Option {
-	return func(o *options) { o.client = c }
-}
+
 func WithImageMetadataGetter(f ImageMetadataGetter) Option {
 	return func(o *options) { o.imageMetadataGetter = f }
 }

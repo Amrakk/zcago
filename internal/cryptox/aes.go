@@ -52,9 +52,9 @@ func DecodeAES(key []byte, data string) ([]byte, error) {
 	plain := make([]byte, len(ciphertext))
 	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plain, ciphertext)
 	plain, err = Pkcs7Unpadding(plain, aes.BlockSize)
-
 	if err != nil {
 		return nil, err
 	}
+
 	return plain, nil
 }

@@ -50,7 +50,7 @@ type paramsEncryptor struct {
 	EncryptKey *string `json:"encryptKey"`
 }
 
-func NewParamsEncryptor(apiType uint, imei string, firstLaunchTime uint) (ParamsEncryptor, error) {
+func NewParamsEncryptor(apiType uint, imei string, firstLaunchTime int64) (ParamsEncryptor, error) {
 	p := Params{
 		ZCID:          "",
 		EncryptVer:    "v2",
@@ -86,7 +86,7 @@ func (pe *paramsEncryptor) GetParams() *Params {
 	return &pe.Params
 }
 
-func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime uint) error {
+func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime int64) error {
 	if apiType == 0 || imei == "" || firstLaunchTime == 0 {
 		return errs.NewZCAError("invalid params", "createZCID", nil)
 	}
@@ -249,7 +249,7 @@ func EncryptParam(sc session.Context, data map[string]any) (*EncryptedPayload, e
 	enc, err := NewParamsEncryptor(
 		sc.APIType(),
 		sc.IMEI(),
-		uint(time.Now().UnixNano()/int64(time.Millisecond)),
+		time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return nil, ErrEncryptParams(err)

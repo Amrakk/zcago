@@ -32,6 +32,9 @@ func (e *ZCAError) Error() string {
 	if e.Op != "" {
 		parts = append(parts, fmt.Sprintf("op=%s", e.Op))
 	}
+	if e.Err != nil && *e.Err != nil {
+		parts = append(parts, fmt.Sprintf("err=%s", (*e.Err).Error()))
+	}
 
 	return strings.Join(parts, ": ")
 }

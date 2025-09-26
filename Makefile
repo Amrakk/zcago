@@ -16,6 +16,10 @@ lint: ### run linters
 	golangci-lint run
 .PHONY: lint
 
+format:
+	gofumpt -w .
+.PHONY: format
+
 test: ### run tests
 	$(GOCMD) test -cover -race ./...
 .PHONY: test
@@ -32,6 +36,6 @@ ex-login: ### run login example
 	$(GOCMD) run ./examples/login.go
 .PHONY: ex-login
 
-ex-test: ### run test example
-	$(GOCMD) run ./examples/test/test.go
-.PHONY: ex-test
+playground: ### Random Go experiments — structs, syntax, whatever
+	$(GOCMD) run ./tests/playground.go
+.PHONY: playground

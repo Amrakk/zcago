@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,15 +16,15 @@ import (
 
 const maxRedirects = 10
 
-func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool) (*http.Response, error) {
-	return requestWithRedirect(ctx, sc, urlStr, opt, raw, 0)
+func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Response, error) {
+	return requestWithRedirect(ctx, sc, urlStr, opt, 0)
 }
 
 func HandleZaloResponse[T any](sc session.Context, resp *http.Response, isEncrypted bool) *ZaloResponse[T] {
 	return handleZaloResponse[T](sc, resp, isEncrypted)
 }
 
-func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, raw bool, depth int) (*http.Response, error) {
+func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, depth int) (*http.Response, error) {
 	if depth > maxRedirects {
 		logger.Log(sc).
 			Warn("Too many redirects, aborting request").
@@ -33,7 +32,7 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 		return nil, errs.NewZCAError("too many redirects", "request", nil)
 	}
 
-	req, err := buildRequest(ctx, sc, urlStr, opt, raw)
+	req, err := buildRequest(ctx, sc, urlStr, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -44,29 +43,34 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 	}
 
 	origin := getOrigin(urlStr)
-	if err := handleCookies(sc, resp, origin, raw); err != nil {
-		return nil, err
-	}
+	handleCookies(sc, resp, origin, opt)
 
 	if loc := resp.Header.Get("Location"); loc != "" {
 		logger.Log(sc).
 			Debug("Following redirect to:", loc).
 			Verbose("Redirect depth:", depth+1)
 
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		func(b io.ReadCloser) {
+			if _, err := io.Copy(io.Discard, b); err != nil {
+				logger.Log(sc).Warn("Failed to discard response body:", err)
+			}
+			_ = b.Close()
+		}(resp.Body)
 
 		nextURL := ResolveURL(urlStr, loc)
 		nextOpt := &RequestOptions{
+			Method: http.MethodGet,
 			Headers: func() http.Header {
-				h := req.Header.Clone()
-				if !raw {
+				if opt != nil && !opt.Raw {
+					h := req.Header.Clone()
+					h.Set("Referer", "https://id.zalo.me/")
+					return h
 				}
-				return h
+				return nil
 			}(),
 			Body: nil,
 		}
-		return requestWithRedirect(ctx, sc, nextURL, nextOpt, raw, depth+1)
+		return requestWithRedirect(ctx, sc, nextURL, nextOpt, depth+1)
 	}
 
 	return resp, nil
@@ -90,13 +94,12 @@ func executeRequest(sc session.MutableContext, req *http.Request, followRedirect
 	return httpClient.Do(req)
 }
 
-func handleCookies(sc session.MutableContext, resp *http.Response, origin string, raw bool) error {
-	if !raw {
+func handleCookies(sc session.MutableContext, resp *http.Response, origin string, opt *RequestOptions) {
+	if opt != nil && !opt.Raw {
 		if err := persistSetCookies(sc, resp, origin); err != nil {
 			logger.Log(sc).Warn("Failed to persist cookies:", err)
 		}
 	}
-	return nil
 }
 
 func persistSetCookies(sc session.MutableContext, resp *http.Response, origin string) error {
@@ -153,9 +156,10 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 	}
 
 	var payloadBytes []byte
+
 	if isEncrypted {
-		key, err := base64.StdEncoding.DecodeString(sc.SecretKey())
-		if err != nil {
+		key := sc.SecretKey().Bytes()
+		if key == nil {
 			logger.Log(sc).Error("Failed to decode secret key:", err)
 			out.Meta.Message = "Failed to decode secret key"
 			return out
@@ -172,13 +176,13 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 		payloadBytes = []byte(*base.Data)
 	}
 
-	var decoded T
+	var decoded Response[T]
 	if err := json.Unmarshal(payloadBytes, &decoded); err != nil {
 		logger.Log(sc).Error("Failed to unmarshal payload:", err)
 		out.Meta.Message = "Failed to parse response data"
 		return out
 	}
 
-	out.Data = &decoded
+	out.Data = decoded.Data
 	return out
 }

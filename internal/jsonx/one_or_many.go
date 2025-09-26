@@ -10,18 +10,22 @@ type OneOrMany[T any] struct {
 	Values []T
 }
 
-func NewOne[T any](v T) OneOrMany[T]      { return OneOrMany[T]{Values: []T{v}} }
-func NewMany[T any](vs ...T) OneOrMany[T] { return OneOrMany[T]{Values: append([]T(nil), vs...)} }
-
-func (o OneOrMany[T]) IsSingle() bool { return len(o.Values) == 1 }
-func (o OneOrMany[T]) First() (T, bool) {
+func (o OneOrMany[T]) Single() (T, bool) {
 	var zero T
-	if len(o.Values) == 0 {
-		return zero, false
+	if len(o.Values) == 1 {
+		return o.Values[0], true
 	}
-	return o.Values[0], true
+	return zero, false
 }
-func (o OneOrMany[T]) AsSlice() []T { return append([]T(nil), o.Values...) }
+
+func (o OneOrMany[T]) Slice() []T {
+	if len(o.Values) == 0 {
+		return nil
+	}
+	cp := make([]T, len(o.Values))
+	copy(cp, o.Values)
+	return cp
+}
 
 func (o *OneOrMany[T]) UnmarshalJSON(b []byte) error {
 	var single T

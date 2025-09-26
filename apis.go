@@ -8,6 +8,27 @@ import (
 )
 
 type API interface {
-	GetContext(ctx context.Context) (session.Context, error)
-	FetchAccountInfo(ctx context.Context) (api.FetchAccountInfoResponse, error)
+	GetContext() (session.Context, error)
+	GetOwnID() string
+	//gen:methods
+
+	// GetUserInfo returns the profile for userID.
+	//
+	// Params:
+	//   ctx    — cancel/deadline control
+	//   userID — target identifier
+	//
+	// Errors: *errs.ZaloAPIError; context.Canceled/DeadlineExceeded; I/O or JSON decode errors.
+	FetchAccountInfo(ctx context.Context) (*api.FetchAccountInfoResponse, error)
+	GetUserInfo(ctx context.Context, userID ...string) (*api.GetUserInfoResponse, error)
+	// UpdateLanguage sets the user’s language.
+	//
+	// Note: Calling this endpoint alone will not update the user’s language.
+	//
+	// Params:
+	//   - ctx  — cancel/deadline control
+	//   - lang — target language ("VI", "EN")
+	//
+	// Errors: *errs.ZaloAPIError
+	UpdateLanguage(ctx context.Context, lang api.Language) (api.UpdateLanguageResponse, error)
 }

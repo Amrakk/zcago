@@ -1,11 +1,27 @@
 package session
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"reflect"
 	"sync"
 )
+
+type SecretKey string
+
+func (s SecretKey) Bytes() []byte {
+	decoded, err := base64.StdEncoding.DecodeString(string(s))
+	if err != nil {
+		return nil
+	}
+	return decoded
+}
+
+func (s SecretKey) IsValid() bool {
+	return s != "" && s.Bytes() != nil
+}
 
 type contextImpl struct {
 	mu sync.RWMutex
@@ -20,7 +36,7 @@ type contextImpl struct {
 
 	opts OptionsSnapshot
 
-	secretKey string
+	secretKey SecretKey
 	loginInfo *LoginInfo
 	settings  *Settings
 	extraVer  *ExtraVer
@@ -68,7 +84,7 @@ type Seal struct {
 	UserAgent string
 	Language  string
 
-	SecretKey string
+	SecretKey SecretKey
 	LoginInfo *LoginInfo
 	Settings  *Settings
 	ExtraVer  *ExtraVer
@@ -95,7 +111,6 @@ func (c *contextImpl) SealLogin(s Seal) {
 	c.loginInfo = s.LoginInfo
 	c.settings = s.Settings
 	c.extraVer = s.ExtraVer
-
 }
 
 func (c *contextImpl) Client() *http.Client    { return c.opts.Client }
@@ -109,6 +124,7 @@ func (c *contextImpl) CookieJar() http.CookieJar {
 	defer c.mu.RUnlock()
 	return c.cookie
 }
+
 func (c *contextImpl) AddCookies(u *url.URL, cookies []*http.Cookie) {
 	c.mu.RLock()
 	jar := c.cookie
@@ -141,7 +157,7 @@ func (c *contextImpl) LoginInfo() *LoginInfo { return c.loginInfo }
 func (c *contextImpl) Settings() *Settings   { return c.settings }
 func (c *contextImpl) ExtraVer() *ExtraVer   { return c.extraVer }
 
-func (c *contextImpl) SecretKey() string { return c.secretKey }
+func (c *contextImpl) SecretKey() SecretKey { return c.secretKey }
 func (c *contextImpl) Cookies(domains ...string) []*http.Cookie {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -159,6 +175,25 @@ func (c *contextImpl) ZPWServiceMap() *ZpwServiceMap {
 		return nil
 	}
 	return &c.loginInfo.ZpwServiceMapV3
+}
+
+func (c *contextImpl) GetZpwService(service string) []string {
+	sm := c.ZPWServiceMap()
+	if sm == nil {
+		return nil
+	}
+
+	val := reflect.ValueOf(sm).Elem()
+	typ := val.Type()
+
+	for i := 0; i < val.NumField(); i++ {
+		field := typ.Field(i)
+		jsonTag := field.Tag.Get("json")
+		if jsonTag == service {
+			return val.Field(i).Interface().([]string)
+		}
+	}
+	return nil
 }
 
 func (c *contextImpl) ZPWWebsocket() []string {

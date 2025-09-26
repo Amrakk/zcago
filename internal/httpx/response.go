@@ -8,11 +8,13 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/Amrakk/zcago/internal/errs"
 )
 
 func DecodeResponse(resp *http.Response) (io.ReadCloser, error) {
 	if resp == nil {
-		return nil, fmt.Errorf("response is nil")
+		return nil, errs.NewZCAError("response is nil", "DecodeResponse", nil)
 	}
 
 	contentEncoding := resp.Header.Get("Content-Encoding")
@@ -31,13 +33,13 @@ func DecodeResponse(resp *http.Response) (io.ReadCloser, error) {
 func ReadJSON(resp *http.Response, target interface{}) error {
 	body, err := DecodeResponse(resp)
 	if err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return err
 	}
 	defer body.Close()
 
 	decoder := json.NewDecoder(body)
 	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf("failed to decode JSON: %w", err)
+		return errs.NewZCAError("failed to decode JSON", "ReadJSON", &err)
 	}
 
 	return nil
@@ -46,7 +48,7 @@ func ReadJSON(resp *http.Response, target interface{}) error {
 func ReadBytes(resp *http.Response) ([]byte, error) {
 	body, err := DecodeResponse(resp)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, err
 	}
 	defer body.Close()
 
@@ -85,17 +87,17 @@ func CheckStatus(resp *http.Response) error {
 type Response[T any] struct {
 	ErrorCode    int    `json:"error_code"`
 	ErrorMessage string `json:"error_message"`
-	Data         *T     `json:"data"`
+	Data         T      `json:"data"`
 }
 
-type BaseResponse = Response[string]
+type BaseResponse = Response[*string]
 
 type ZaloResponse[T any] struct {
 	Meta struct {
 		Code    int
 		Message string
 	}
-	Data *T
+	Data T
 }
 
 func ParseBaseResponse(resp *http.Response) (*BaseResponse, error) {
