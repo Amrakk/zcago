@@ -3,6 +3,7 @@ package session
 import (
 	"net/http"
 	"net/url"
+	"time"
 )
 
 type Context interface {
@@ -35,6 +36,8 @@ type Context interface {
 	ExtraVer() *ExtraVer
 
 	ZPWWebsocket() []string
+	WSPingInterval() time.Duration
+
 	ZPWServiceMap() *ZpwServiceMap
 	GetZpwService(service string) []string
 }
@@ -45,6 +48,8 @@ type MutableContext interface {
 	SealLogin(seal Seal) // one-shot finalization
 
 	Client() *http.Client
+	Proxy() func(*http.Request) (*url.URL, error)
+
 	SetIMEI(imei string)
 	SetUserAgent(ua string)
 	SetLanguage(lang string)

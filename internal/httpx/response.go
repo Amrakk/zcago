@@ -81,7 +81,7 @@ func CheckStatus(resp *http.Response) error {
 	}
 
 	body, _ := ReadString(resp)
-	return fmt.Errorf("HTTP %d: %s", resp.StatusCode, body)
+	return errs.NewZCAError(fmt.Sprintf("Status %d: %s", resp.StatusCode, body), "", nil)
 }
 
 type Response[T any] struct {

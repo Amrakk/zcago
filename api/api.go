@@ -8,24 +8,30 @@ import (
 	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/logger"
+	"github.com/Amrakk/zcago/listener"
 	"github.com/Amrakk/zcago/session"
 )
 
-func New(ctx session.MutableContext) (*api, error) {
-	a := &api{
-		ctx: ctx,
-	}
+func New(sc session.MutableContext) (*api, error) {
+	a := &api{sc: sc}
 
 	if err := a.initEndpoints(); err != nil {
 		return nil, err
 	}
 
+	l, err := listener.New(sc, sc.ZPWWebsocket())
+	if err != nil {
+		return nil, err
+	}
+	a.l = l
+
 	return a, nil
 }
 
 type api struct {
-	ctx session.MutableContext
-	e   endpoints
+	sc session.MutableContext
+	e  endpoints
+	l  listener.Listener
 }
 
 type endpoints struct {
@@ -37,16 +43,16 @@ type endpoints struct {
 }
 
 func (a *api) initEndpoints() error {
-	if !a.ctx.SecretKey().IsValid() {
+	if !a.sc.SecretKey().IsValid() {
 		return errs.NewZCAError("secret key missing or invalid", "", nil)
 	}
 
 	return firstErr(
 		//gen:binds
 
-		bind(a.ctx, a, &a.e.FetchAccountInfo, fetchAccountInfoFactory),
-		bind(a.ctx, a, &a.e.GetUserInfo, getUserInfoFactory),
-		bind(a.ctx, a, &a.e.UpdateLanguage, updateLanguageFactory),
+		bind(a.sc, a, &a.e.FetchAccountInfo, fetchAccountInfoFactory),
+		bind(a.sc, a, &a.e.GetUserInfo, getUserInfoFactory),
+		bind(a.sc, a, &a.e.UpdateLanguage, updateLanguageFactory),
 	)
 }
 
@@ -60,7 +66,7 @@ type factoryUtils[T any] struct {
 
 type (
 	handler[T any, R any]         func(api *api, sc session.Context, utils factoryUtils[T]) (R, error)
-	endpointFactory[T any, R any] func(ctx session.MutableContext, api *api) (R, error)
+	endpointFactory[T any, R any] func(sc session.MutableContext, api *api) (R, error)
 )
 
 func apiFactory[T any, R any]() func(
@@ -74,7 +80,7 @@ func apiFactory[T any, R any]() func(
 				},
 				EncodeAES: func(data string) (string, error) {
 					key := sc.SecretKey().Bytes()
-					return cryptox.EncodeAES(key, data, cryptox.EncryptTypeBase64)
+					return cryptox.EncodeAESCBC(key, data, cryptox.EncryptTypeBase64)
 				},
 				Request: func(ctx context.Context, url string, opts *httpx.RequestOptions) (*http.Response, error) {
 					return httpx.Request(ctx, sc, url, opts)

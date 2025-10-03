@@ -6,9 +6,9 @@ import (
 )
 
 func (a *api) GetContext() (session.Context, error) {
-	if a.ctx == nil {
+	if a.sc == nil {
 		return nil, errs.NewZCAError("API context is not initialized", "GetContext", nil)
 	}
 
-	return a.ctx, nil
+	return a.sc, nil
 }

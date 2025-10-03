@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type SecretKey string
@@ -113,7 +114,18 @@ func (c *contextImpl) SealLogin(s Seal) {
 	c.extraVer = s.ExtraVer
 }
 
-func (c *contextImpl) Client() *http.Client    { return c.opts.Client }
+func (c *contextImpl) Client() *http.Client { return c.opts.Client }
+func (c *contextImpl) Proxy() func(*http.Request) (*url.URL, error) {
+	client := c.opts.Client
+
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok || transport == nil {
+		transport = http.DefaultTransport.(*http.Transport)
+	}
+
+	return transport.Proxy
+}
+
 func (c *contextImpl) SetIMEI(imei string)     { c.mu.Lock(); c.imei = imei; c.mu.Unlock() }
 func (c *contextImpl) SetUserAgent(ua string)  { c.mu.Lock(); c.userAgent = ua; c.mu.Unlock() }
 func (c *contextImpl) SetLanguage(lang string) { c.mu.Lock(); c.language = lang; c.mu.Unlock() }
@@ -158,6 +170,8 @@ func (c *contextImpl) Settings() *Settings   { return c.settings }
 func (c *contextImpl) ExtraVer() *ExtraVer   { return c.extraVer }
 
 func (c *contextImpl) SecretKey() SecretKey { return c.secretKey }
+
+// TODO: fix this
 func (c *contextImpl) Cookies(domains ...string) []*http.Cookie {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -175,6 +189,14 @@ func (c *contextImpl) ZPWServiceMap() *ZpwServiceMap {
 		return nil
 	}
 	return &c.loginInfo.ZpwServiceMapV3
+}
+
+func (c *contextImpl) WSPingInterval() time.Duration {
+	if c.settings == nil ||
+		c.settings.Features.Socket.PingInterval <= 0 {
+		return 0
+	}
+	return time.Duration(c.settings.Features.Socket.PingInterval) * time.Millisecond
 }
 
 func (c *contextImpl) GetZpwService(service string) []string {

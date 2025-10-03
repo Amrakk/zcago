@@ -104,7 +104,7 @@ func decryptLoginResponse(key, data *string) (*httpx.Response[*session.LoginInfo
 		return nil, err
 	}
 
-	plain, err := cryptox.DecodeAES([]byte(*key), u)
+	plain, err := cryptox.DecodeAESCBC([]byte(*key), u)
 	if err != nil {
 		return nil, err
 	}

@@ -17,7 +17,7 @@ type App struct {
 
 func main() {
 	app := &App{
-		zalo:     zcago.NewZalo(),
+		zalo:     zcago.NewZalo(zcago.WithLogLevel(2)),
 		credPath: filepath.Join(rootDir(), "examples", "credentials.json"),
 	}
 

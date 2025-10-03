@@ -165,7 +165,7 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 			return out
 		}
 
-		plain, err := cryptox.DecodeAES(key, *base.Data)
+		plain, err := cryptox.DecodeAESCBC(key, *base.Data)
 		if err != nil {
 			logger.Log(sc).Error("Failed to decrypt payload:", err)
 			out.Meta.Message = "Failed to decrypt response data"

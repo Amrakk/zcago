@@ -95,7 +95,7 @@ func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime
 	data := fmt.Sprintf("%d,%s,%d", apiType, imei, firstLaunchTime)
 	encType := cryptox.EncryptTypeHex
 
-	s, err := cryptox.EncodeAES([]byte(key), data, encType)
+	s, err := cryptox.EncodeAESCBC([]byte(key), data, encType)
 	if err != nil {
 		return err
 	}
@@ -265,7 +265,7 @@ func EncryptParam(sc session.Context, data map[string]any) (*EncryptedPayload, e
 		return nil, ErrEncryptParams(err)
 	}
 
-	cipher, err := cryptox.EncodeAES([]byte(key), string(blob), "")
+	cipher, err := cryptox.EncodeAESCBC([]byte(key), string(blob), "")
 	if err != nil {
 		return nil, ErrEncryptParams(err)
 	}

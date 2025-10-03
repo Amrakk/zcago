@@ -1,5 +1,5 @@
 package api
 
 func (a *api) GetOwnID() string {
-	return a.ctx.UID()
+	return a.sc.UID()
 }

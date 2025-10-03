@@ -23,10 +23,10 @@ type Zalo interface {
 
 type zalo struct {
 	enableEncryptParam bool
-	opts               []Option
+	opts               []session.Option
 }
 
-func NewZalo(opts ...Option) Zalo {
+func NewZalo(opts ...session.Option) Zalo {
 	z := &zalo{
 		enableEncryptParam: true,
 		opts:               opts,
@@ -36,8 +36,7 @@ func NewZalo(opts ...Option) Zalo {
 }
 
 func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
-	sessionOpts := toSessionOptions(z.opts...)
-	appCtx := session.NewContext(sessionOpts...)
+	appCtx := session.NewContext(z.opts...)
 
 	return z.loginCookie(ctx, appCtx, cred)
 }

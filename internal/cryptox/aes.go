@@ -14,7 +14,7 @@ const (
 	EncryptTypeBase64 EncryptType = "base64"
 )
 
-func EncodeAES(key []byte, data string, encType EncryptType) (string, error) {
+func EncodeAESCBC(key []byte, data string, encType EncryptType) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -37,7 +37,7 @@ func EncodeAES(key []byte, data string, encType EncryptType) (string, error) {
 	}
 }
 
-func DecodeAES(key []byte, data string) ([]byte, error) {
+func DecodeAESCBC(key []byte, data string) ([]byte, error) {
 	ciphertext, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return nil, err
@@ -52,6 +52,25 @@ func DecodeAES(key []byte, data string) ([]byte, error) {
 	plain := make([]byte, len(ciphertext))
 	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plain, ciphertext)
 	plain, err = Pkcs7Unpadding(plain, aes.BlockSize)
+	if err != nil {
+		return nil, err
+	}
+
+	return plain, nil
+}
+
+func DecodeAESGCM(key, iv, aad, ct []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCMWithNonceSize(block, 16)
+	if err != nil {
+		return nil, err
+	}
+
+	plain, err := gcm.Open(nil, iv, ct, aad)
 	if err != nil {
 		return nil, err
 	}
