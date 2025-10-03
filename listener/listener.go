@@ -181,8 +181,9 @@ func (ln *listener) run(retryOnClose bool) {
 	errsCh := cl.Errors()
 	msgsCh := cl.Messages()
 	closCh := cl.Closed()
+	open := 3
 
-	for {
+	for open > 0 {
 		select {
 		case <-ctx.Done():
 			return
@@ -190,6 +191,7 @@ func (ln *listener) run(retryOnClose bool) {
 		case err, ok := <-errsCh:
 			if !ok {
 				errsCh = nil
+				open--
 				continue
 			}
 			ln.emitError(ctx, err)
@@ -197,19 +199,18 @@ func (ln *listener) run(retryOnClose bool) {
 		case msg, ok := <-msgsCh:
 			if !ok {
 				msgsCh = nil
+				open--
 				continue
 			}
 			ln.handleWebSocketMessage(ctx, msg)
 
 		case ci, ok := <-closCh:
 			if !ok {
-				return
+				closCh = nil
+				open--
+				continue
 			}
 			ln.handleConnectionClose(ctx, ci, retryOnClose)
-			return
-		}
-
-		if errsCh == nil && msgsCh == nil && closCh == nil {
 			return
 		}
 	}
@@ -228,7 +229,10 @@ func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.Clo
 	}
 
 	if ln.shouldRetryConnection(ctx, ci, retryOnClose) {
-		ln.scheduleReconnection(ci)
+		if err := ln.scheduleReconnection(ci); err != nil {
+			ln.emitError(ctx, errs.NewZCAError("Failed to schedule reconnection:", "handleConnectionClose", &err))
+			ln.emitClosed(ctx, ci)
+		}
 	} else {
 		ln.emitClosed(ctx, ci)
 	}
@@ -312,7 +316,7 @@ func buildRetryStates(sc session.MutableContext) map[string]*retryState {
 	retryStates := make(map[string]*retryState, 8)
 	if s := sc.Settings(); s != nil && s.Features.Socket.Retries != nil {
 		for reason, cfg := range s.Features.Socket.Retries {
-			max := uint(0)
+			max := 0
 			if cfg.Max != nil {
 				max = *cfg.Max
 			}
@@ -324,7 +328,7 @@ func buildRetryStates(sc session.MutableContext) map[string]*retryState {
 			retryStates[reason] = &retryState{
 				count: 0,
 				max:   max,
-				times: append([]uint(nil), times...),
+				times: append([]int(nil), times...),
 			}
 		}
 	}

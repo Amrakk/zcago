@@ -2,6 +2,7 @@ package listener
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Amrakk/zcago/internal/errs"
@@ -11,14 +12,16 @@ import (
 )
 
 func (ln *listener) router(version, cmd, sub uint, body BaseWSMessage) {
-	switch {
-	case version == 1 && cmd == 1 && sub == 1:
+	key := fmt.Sprintf("%d_%d_%d", version, cmd, sub)
+
+	switch key {
+	case "1_1_1":
 		ln.handleCipherKey(body)
 
-	case version == 1 && cmd == 501 && sub == 0:
+	case "1_501_0":
 		ln.handleMessages(body)
 
-	case version == 1 && cmd == 3000 && sub == 0:
+	case "1_3000_0":
 		ln.handleDuplicateConnection()
 
 	default:
@@ -45,7 +48,9 @@ func (ln *listener) handleCipherKey(body BaseWSMessage) {
 			SubCMD:  1,
 			Data:    map[string]any{"eventId": time.Now().UnixMilli()},
 		}
-		ln.SendWS(ln.ctx, payload, false)
+		if err := ln.SendWS(ln.ctx, payload, false); err != nil {
+			ln.emitError(ln.ctx, errs.NewZCAError("Failed to send ping:", "ping", &err))
+		}
 	}
 
 	interval := ln.sc.WSPingInterval()
@@ -86,7 +91,7 @@ func (ln *listener) handleDuplicateConnection() {
 	logger.Log(ln.sc).Error()
 	logger.Log(ln.sc).Error("Another connection is opened, closing this one")
 	logger.Log(ln.sc).Error()
-	ln.client.Close(ZaloDuplicateConnection, "")
+	ln.client.Close(ZaloDuplicateConnection, "Another connection is opened, closing this one")
 }
 
 //

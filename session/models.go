@@ -37,7 +37,7 @@ type SocketSettings struct {
 	RotateErrorCodes []int                        `json:"rotate_error_codes"`
 	Retries          map[string]SocketRetryConfig `json:"retries"`
 	Debug            SocketDebug                  `json:"debug"`
-	PingInterval     uint                         `json:"ping_interval"`
+	PingInterval     int                          `json:"ping_interval"`
 	ResetEndpoint    uint                         `json:"reset_endpoint"`
 	QueueCtrlAction  QueueCtrlActionIDMap         `json:"queue_ctrl_actionid_map"`
 	CloseAndRetry    []int                        `json:"close_and_retry_codes"`
@@ -51,8 +51,8 @@ type SocketSettings struct {
 }
 
 type SocketRetryConfig struct {
-	Max   *uint                 `json:"max,omitempty"`
-	Times jsonx.OneOrMany[uint] `json:"times"`
+	Max   *int                 `json:"max,omitempty"`
+	Times jsonx.OneOrMany[int] `json:"times"`
 }
 
 type SocketDebug struct {

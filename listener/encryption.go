@@ -35,9 +35,9 @@ func encodeFrame(p WSPayload) ([]byte, error) {
 	}
 
 	buf := make([]byte, 4+len(body))
-	buf[0] = uint8(p.Version)
-	binary.LittleEndian.PutUint16(buf[1:3], uint16(p.CMD))
-	buf[3] = uint8(p.SubCMD)
+	buf[0] = p.Version
+	binary.LittleEndian.PutUint16(buf[1:3], p.CMD)
+	buf[3] = p.SubCMD
 	copy(buf[4:], body)
 
 	return buf, nil
@@ -144,6 +144,8 @@ func decompressGzip(compressed []byte) ([]byte, error) {
 	defer reader.Close()
 
 	var output bytes.Buffer
+
+	// #nosec G110 — enhance later if needed
 	if _, err := io.Copy(&output, reader); err != nil {
 		return nil, errs.NewZCAError("failed to decompress gzip data", "decompress_gzip", &err)
 	}

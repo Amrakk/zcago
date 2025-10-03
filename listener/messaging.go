@@ -12,9 +12,9 @@ import (
 )
 
 type WSPayload struct {
-	Version uint
-	CMD     uint
-	SubCMD  uint
+	Version uint8
+	CMD     uint16
+	SubCMD  uint8
 	Data    map[string]any
 }
 
@@ -57,7 +57,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 }
 
 func (ln *listener) RequestOldMessages(ctx context.Context, tt model.ThreadType, lastMsgID *string) error {
-	cmd := 510
+	cmd := uint16(510)
 	if tt == model.ThreadTypeUser {
 		cmd = 511
 	}
@@ -69,14 +69,14 @@ func (ln *listener) RequestOldMessages(ctx context.Context, tt model.ThreadType,
 
 	return ln.SendWS(ctx, WSPayload{
 		Version: 1,
-		CMD:     uint(cmd),
+		CMD:     cmd,
 		SubCMD:  1,
 		Data:    data,
 	}, true)
 }
 
 func (ln *listener) RequestOldReactions(ctx context.Context, tt model.ThreadType, lastMsgID *string) error {
-	cmd := 610
+	cmd := uint16(610)
 	if tt == model.ThreadTypeUser {
 		cmd = 611
 	}
@@ -88,7 +88,7 @@ func (ln *listener) RequestOldReactions(ctx context.Context, tt model.ThreadType
 
 	return ln.SendWS(ctx, WSPayload{
 		Version: 1,
-		CMD:     uint(cmd),
+		CMD:     cmd,
 		SubCMD:  1,
 		Data:    data,
 	}, true)

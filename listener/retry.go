@@ -13,9 +13,9 @@ import (
 )
 
 type retryState struct {
-	count uint
-	max   uint
-	times []uint
+	count int
+	max   int
+	times []int
 }
 
 func (ln *listener) shouldRetryConnection(ctx context.Context, ci websocketx.CloseInfo, retryOnClose bool) bool {
@@ -27,11 +27,13 @@ func (ln *listener) shouldRetryConnection(ctx context.Context, ci websocketx.Clo
 	return allowed
 }
 
-func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) {
+func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) error {
 	delay, _ := ln.canRetry(ci.Code)
 
 	if ln.shouldRotate(ci.Code) {
-		ln.rotateEndpoint()
+		if err := ln.rotateEndpoint(); err != nil {
+			return err
+		}
 	}
 
 	time.AfterFunc(time.Duration(delay)*time.Millisecond, func() {
@@ -48,9 +50,11 @@ func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) {
 			}
 		}
 	})
+
+	return nil
 }
 
-func (ln *listener) canRetry(code int) (uint, bool) {
+func (ln *listener) canRetry(code int) (int, bool) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
@@ -70,8 +74,8 @@ func (ln *listener) canRetry(code int) (uint, bool) {
 	idx := st.count
 	st.count++
 
-	var delay uint
-	if idx < uint(len(st.times)) {
+	var delay int
+	if idx < len(st.times) {
 		delay = st.times[idx]
 	} else {
 		delay = st.times[len(st.times)-1]
