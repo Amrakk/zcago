@@ -2,12 +2,12 @@ package httpx
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -67,10 +67,10 @@ func getDefaultHeaders(sc session.Context, origin string) (http.Header, error) {
 		origin = "https://chat.zalo.me"
 	}
 	if sc == nil || len(sc.Cookies()) == 0 {
-		return nil, errs.NewZCAError("cookie is not available", "context", nil)
+		return nil, fmt.Errorf("cookie is not available")
 	}
 	if sc.UserAgent() == "" {
-		return nil, errs.NewZCAError("user agent is not available", "context", nil)
+		return nil, fmt.Errorf("user agent is not available")
 	}
 
 	cookieStr := cookieString(sc.Cookies(origin))

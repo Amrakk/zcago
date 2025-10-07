@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"time"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 )
 
 type Credentials struct {
@@ -23,6 +25,10 @@ func NewCredentials(imei string, cookie CookieUnion, userAgent string, language 
 		UserAgent: userAgent,
 		Language:  language,
 	}
+}
+
+func (c Credentials) IsValid() bool {
+	return len(c.Imei) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
 }
 
 type SameSite string
@@ -191,10 +197,30 @@ func (cu *CookieUnion) GetHTTPCookies() []*http.Cookie {
 	return httpCookies
 }
 
+func (cu *CookieUnion) BuildCookieJar(u *url.URL) http.CookieJar {
+	cookieArr := cu.GetCookies()
+
+	for i := range cookieArr {
+		if len(cookieArr[i].Domain) > 0 && cookieArr[i].Domain[0] == '.' {
+			cookieArr[i].Domain = cookieArr[i].Domain[1:]
+		}
+	}
+
+	jar, _ := cookiejar.New(nil)
+	cookies := make([]*http.Cookie, len(cookieArr))
+
+	for i, c := range cookieArr {
+		cookies[i] = c.ToHTTPCookie()
+	}
+
+	jar.SetCookies(u, cookies)
+	return jar
+}
+
 func (cu CookieUnion) MarshalJSON() ([]byte, error) {
 	switch {
 	case cu.cookies != nil && cu.j2cookie != nil:
-		return nil, errs.NewZCAError("both cookies and j2cookie are set", "CookieUnion.MarshalJSON", nil)
+		return nil, errs.NewZCA("both cookies and j2cookie are set", "CookieUnion.MarshalJSON")
 	case cu.cookies != nil:
 		return json.Marshal(cu.cookies)
 	case cu.j2cookie != nil:

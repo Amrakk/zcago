@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/websocketx"
 	"github.com/Amrakk/zcago/model"
 )
@@ -39,7 +39,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 
 	client := ln.getClient()
 	if client == nil {
-		return errs.NewZCAError("listener not started", "listener.SendWS", nil)
+		return errs.NewZCA("listener not started", "listener.SendWS")
 	}
 
 	if requireID {
@@ -48,7 +48,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 
 	frame, err := encodeFrame(p)
 	if err != nil {
-		return errs.NewZCAError("failed to encode frame", "listener.SendWS", &err)
+		return errs.WrapZCA("failed to encode frame", "listener.SendWS", err)
 	}
 
 	client.Write(websocketx.BinaryMessage, frame)
@@ -96,14 +96,14 @@ func (ln *listener) RequestOldReactions(ctx context.Context, tt model.ThreadType
 
 func (ln *listener) validateSendRequest(ctx context.Context) error {
 	if ln == nil {
-		return errs.NewZCAError("listener is nil", "listener.SendWS", nil)
+		return errs.NewZCA("listener is nil", "listener.validateSendRequest")
 	}
 	if ctx == nil {
-		return errs.NewZCAError("context is nil", "listener.SendWS", nil)
+		return errs.NewZCA("context is nil", "listener.validateSendRequest")
 	}
 	if ctx.Err() != nil {
 		err := ctx.Err()
-		return errs.NewZCAError("context cancelled", "listener.SendWS", &err)
+		return errs.WrapZCA("context cancelled", "listener.validateSendRequest", err)
 	}
 	return nil
 }
@@ -142,7 +142,7 @@ func (ln *listener) handleWebSocketMessage(ctx context.Context, msg websocketx.M
 
 	var parsed BaseWSMessage
 	if err := json.Unmarshal(data, &parsed); err != nil {
-		ln.emitError(ctx, errs.NewZCAError("Error parsing JSON: %v", "ws", &err))
+		ln.emitError(ctx, errs.WrapZCA("failed to parse message JSON", "listener.handleWebSocketMessage", err))
 		return
 	}
 
@@ -151,7 +151,7 @@ func (ln *listener) handleWebSocketMessage(ctx context.Context, msg websocketx.M
 
 func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {
 	if len(data) < 4 {
-		return 0, 0, 0, nil, errs.NewZCAError("message too short", "ws", nil)
+		return 0, 0, 0, nil, errs.NewZCA("message too short", "listener.parseWebSocketMessage")
 	}
 
 	header := make([]byte, 4)
@@ -159,12 +159,12 @@ func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {
 
 	version, cmd, subCMD, err := getHeader(header)
 	if err != nil {
-		return 0, 0, 0, nil, errs.NewZCAError("Error parsing header: %v", "ws", &err)
+		return 0, 0, 0, nil, err
 	}
 
 	msgData := data[4:]
 	if len(msgData) == 0 {
-		return 0, 0, 0, nil, errs.NewZCAError("empty message data", "ws", nil)
+		return 0, 0, 0, nil, errs.NewZCA("empty message data", "listener.parseWebSocketMessage")
 	}
 
 	return version, cmd, subCMD, msgData, nil
@@ -172,7 +172,7 @@ func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {
 
 func getHeader(buffer []byte) (byte, uint16, byte, error) {
 	if len(buffer) < 4 {
-		return 0, 0, 0, errs.NewZaloAPIError("invalid header", nil)
+		return 0, 0, 0, errs.NewZCA("invalid header", "listener.getHeader")
 	}
 
 	version := buffer[0]

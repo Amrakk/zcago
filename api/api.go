@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/listener"
@@ -44,7 +44,7 @@ type endpoints struct {
 
 func (a *api) initEndpoints() error {
 	if !a.sc.SecretKey().IsValid() {
-		return errs.NewZCAError("secret key missing or invalid", "", nil)
+		return errs.NewZCA("secret key missing or invalid", "api.initEndpoints")
 	}
 
 	return firstErr(
@@ -106,7 +106,7 @@ func resolveResponse[T any](
 
 	r := httpx.HandleZaloResponse[T](sc, res, isEncrypted)
 	if r == nil {
-		return zero, errs.NewZCAError("nil ZaloResponse", "resolveResponse", nil)
+		return zero, errs.NewZCA("empty response", "api.resolveResponse")
 	}
 	if r.Meta.Code != 0 {
 		var zero T

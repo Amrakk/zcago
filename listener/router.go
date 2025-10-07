@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/listener/events"
 	"github.com/Amrakk/zcago/model"
@@ -49,7 +49,7 @@ func (ln *listener) handleCipherKey(body BaseWSMessage) {
 			Data:    map[string]any{"eventId": time.Now().UnixMilli()},
 		}
 		if err := ln.SendWS(ln.ctx, payload, false); err != nil {
-			ln.emitError(ln.ctx, errs.NewZCAError("Failed to send ping:", "ping", &err))
+			ln.emitError(ln.ctx, errs.WrapZCA("failed to send ping:", "ping", err))
 		}
 	}
 
@@ -65,7 +65,7 @@ func (ln *listener) handleCipherKey(body BaseWSMessage) {
 func (ln *listener) handleMessages(body BaseWSMessage) {
 	eventData, err := decodeEventData[events.MessageEventData](body, ln.cipherKey)
 	if err != nil {
-		err = errs.NewZCAError("Failed to decode event data:", "handleMessages", &err)
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleMessages", err)
 		ln.emitError(ln.ctx, err)
 		return
 	}

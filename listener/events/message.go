@@ -3,7 +3,7 @@ package events
 import (
 	"encoding/json"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/model"
 )
 
@@ -27,7 +27,7 @@ func (m *messageOrUndo) UnmarshalJSON(data []byte) error {
 		m.Message = &tm
 		return nil
 	}
-	return errs.NewZCAError("MessageOrUndo: data did not match TMessage or TUndo", "", nil)
+	return errs.NewZCA("data did not match TMessage or TUndo", "messageOrUndo.UnmarshalJSON")
 }
 
 func (m messageOrUndo) MarshalJSON() ([]byte, error) {
@@ -37,5 +37,5 @@ func (m messageOrUndo) MarshalJSON() ([]byte, error) {
 	if m.Undo != nil {
 		return json.Marshal(m.Undo)
 	}
-	return nil, errs.NewZCAError("MessageOrUndo: both Message and Undo are nil", "", nil)
+	return nil, errs.NewZCA("both Message and Undo are nil", "messageOrUndo.MarshalJSON")
 }

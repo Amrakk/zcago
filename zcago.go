@@ -2,14 +2,12 @@ package zcago
 
 import (
 	"context"
-	"net/http"
-	"net/http/cookiejar"
 	"net/url"
 
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Amrakk/zcago/api"
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 	"github.com/Amrakk/zcago/session/auth"
@@ -82,8 +80,8 @@ func (z *zalo) LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallb
 }
 
 func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred Credentials) (API, error) {
-	if err := z.validateParams(cred); err != nil {
-		return nil, err
+	if ok := cred.IsValid(); !ok {
+		return nil, errs.NewZCA("invalid credentials", "zalo.loginCookie")
 	}
 
 	lang := "vi"
@@ -93,7 +91,10 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	sc.SetIMEI(cred.Imei)
 	sc.SetLanguage(lang)
 	sc.SetUserAgent(cred.UserAgent)
-	sc.SetCookieJar(z.parseCookies(cred.Cookie))
+
+	u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
+	jar := cred.Cookie.BuildCookieJar(&u)
+	sc.SetCookieJar(jar)
 
 	var (
 		loginInfo  *session.LoginInfo
@@ -133,7 +134,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 			return nil, err
 		}
 		logger.Log(sc).Error("Login or server info is empty")
-		return nil, errs.NewZCAError("Login failed", "Login", nil)
+		return nil, errs.NewZCA("Login failed", "zalo.loginCookie")
 	}
 
 	secretKey := session.SecretKey(loginInfo.ZPWEnk)
@@ -151,32 +152,4 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 
 	logger.Log(sc).Success("Successfully logged in as ", sc.UID())
 	return api.New(sc)
-}
-
-func (z *zalo) parseCookies(cookie CookieUnion) http.CookieJar {
-	cookieArr := cookie.GetCookies()
-
-	for i := range cookieArr {
-		if len(cookieArr[i].Domain) > 0 && cookieArr[i].Domain[0] == '.' {
-			cookieArr[i].Domain = cookieArr[i].Domain[1:]
-		}
-	}
-
-	jar, _ := cookiejar.New(nil)
-	cookies := make([]*http.Cookie, len(cookieArr))
-	url := url.URL{Scheme: "https", Host: "chat.zalo.me"}
-
-	for i, c := range cookieArr {
-		cookies[i] = c.ToHTTPCookie()
-	}
-
-	jar.SetCookies(&url, cookies)
-	return jar
-}
-
-func (z *zalo) validateParams(cred Credentials) error {
-	if len(cred.Imei) == 0 || !cred.Cookie.IsValid() || len(cred.UserAgent) == 0 {
-		return errs.NewZCAError("invalid credentials", "", nil)
-	}
-	return nil
 }

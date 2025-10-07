@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"unicode/utf8"
 
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/errs"
 )
 
 const (
@@ -31,7 +31,7 @@ func encodeFrame(p WSPayload) ([]byte, error) {
 
 	body, err := json.Marshal(p.Data)
 	if err != nil {
-		return nil, errs.NewZaloAPIError("failed to marshal data", nil)
+		return nil, errs.WrapZCA("failed to marshal data", "listener.encodeFrame", err)
 	}
 
 	buf := make([]byte, 4+len(body))
@@ -68,7 +68,7 @@ func decodeEventData[T any](parsed BaseWSMessage, cipherKey string) (*WSMessage[
 	}
 
 	if !utf8.Valid(payload) {
-		return nil, errs.NewZCAError("payload is not valid UTF-8", "decode_event_data", nil)
+		return nil, errs.NewZCA("payload is not valid UTF-8", "listener.decodeEventData")
 	}
 
 	return parseJSON[T](payload)
@@ -78,8 +78,8 @@ func extractEncryptionType(parsed BaseWSMessage) (uint, error) {
 	encType := parsed.Encrypt
 
 	if encType > EncryptionTypeAESGCMRaw {
-		errMsg := fmt.Sprintf("Invalid encryption type, expected 0-%d but got %d", EncryptionTypeAESGCMRaw, encType)
-		return 0, errs.NewZaloAPIError(errMsg, nil)
+		errMsg := fmt.Sprintf("invalid encryption type, expected 0-%d but got %d", EncryptionTypeAESGCMRaw, encType)
+		return 0, errs.NewZCA(errMsg, "listener.extractEncryptionType")
 	}
 
 	return encType, nil
@@ -90,14 +90,14 @@ func decodeAndDecrypt(data string, encType uint, cipherKey string) ([]byte, erro
 	if encType != EncryptionTypeBase64 {
 		unescaped, err := url.PathUnescape(data)
 		if err != nil {
-			return nil, errs.NewZCAError("failed to URL unescape data", "decode_and_decrypt", &err)
+			return nil, errs.WrapZCA("failed to URL unescape data", "listener.decodeAndDecrypt", err)
 		}
 		b64Data = unescaped
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(b64Data)
 	if err != nil {
-		return nil, errs.NewZCAError("failed to base64-decode data", "decode_and_decrypt", &err)
+		return nil, errs.WrapZCA("failed to base64-decode data", "listener.decodeAndDecrypt", err)
 	}
 
 	switch encType {
@@ -106,22 +106,22 @@ func decodeAndDecrypt(data string, encType uint, cipherKey string) ([]byte, erro
 	case EncryptionTypeAESGCM, EncryptionTypeAESGCMRaw:
 		return decryptAESGCM(decoded, cipherKey)
 	default:
-		return nil, errs.NewZCAError("unsupported encryption type", "decode_and_decrypt", nil)
+		return nil, errs.NewZCA("unsupported encryption type", "listener.decodeAndDecrypt")
 	}
 }
 
 func decryptAESGCM(encryptedData []byte, cipherKey string) ([]byte, error) {
 	if cipherKey == "" {
-		return nil, errs.NewZCAError("cipher key is required for encrypted data", "decrypt_aes_gcm", nil)
+		return nil, errs.NewZCA("cipher key is required for encrypted data", "listener.decryptAESGCM")
 	}
 
 	if len(encryptedData) < minEncryptedDataLength {
-		return nil, errs.NewZCAError("encrypted data too short", "decrypt_aes_gcm", nil)
+		return nil, errs.NewZCA("encrypted data too short", "listener.decryptAESGCM")
 	}
 
 	key, err := base64.StdEncoding.DecodeString(cipherKey)
 	if err != nil {
-		return nil, errs.NewZCAError("failed to decode cipher key", "decrypt_aes_gcm", &err)
+		return nil, errs.WrapZCA("failed to decode cipher key", "listener.decryptAESGCM", err)
 	}
 
 	iv := encryptedData[0:16]
@@ -130,7 +130,7 @@ func decryptAESGCM(encryptedData []byte, cipherKey string) ([]byte, error) {
 
 	plaintext, err := cryptox.DecodeAESGCM(key, iv, aad, ciphertext)
 	if err != nil {
-		return nil, errs.NewZCAError("AES-GCM decryption failed", "decrypt_aes_gcm", &err)
+		return nil, errs.WrapZCA("AES-GCM decryption failed", "listener.decryptAESGCM", err)
 	}
 
 	return plaintext, nil
@@ -139,7 +139,7 @@ func decryptAESGCM(encryptedData []byte, cipherKey string) ([]byte, error) {
 func decompressGzip(compressed []byte) ([]byte, error) {
 	reader, err := gzip.NewReader(bytes.NewReader(compressed))
 	if err != nil {
-		return nil, errs.NewZCAError("failed to create gzip reader", "decompress_gzip", &err)
+		return nil, errs.WrapZCA("failed to create gzip reader", "listener.decompressGzip", err)
 	}
 	defer reader.Close()
 
@@ -147,7 +147,7 @@ func decompressGzip(compressed []byte) ([]byte, error) {
 
 	// #nosec G110 — enhance later if needed
 	if _, err := io.Copy(&output, reader); err != nil {
-		return nil, errs.NewZCAError("failed to decompress gzip data", "decompress_gzip", &err)
+		return nil, errs.WrapZCA("failed to decompress gzip data", "listener.decompressGzip", err)
 	}
 
 	return output.Bytes(), nil
@@ -156,7 +156,7 @@ func decompressGzip(compressed []byte) ([]byte, error) {
 func parseJSON[T any](data []byte) (*WSMessage[T], error) {
 	var result WSMessage[T]
 	if err := json.Unmarshal(data, &result); err != nil {
-		return nil, errs.NewZCAError("failed to parse JSON data", "parse_json", &err)
+		return nil, errs.WrapZCA("failed to parse JSON data", "listener.parseJSON", err)
 	}
 	return &result, nil
 }

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -74,7 +73,7 @@ func NewParamsEncryptor(apiType uint, imei string, firstLaunchTime int64) (Param
 
 func (pe *paramsEncryptor) GetEncryptKey() (string, error) {
 	if pe.EncryptKey == nil {
-		return "", errs.NewZCAError("didn't create encryptKey yet", "getEncryptKey", nil)
+		return "", fmt.Errorf("didn't create encryptKey yet")
 	}
 	return *pe.EncryptKey, nil
 }
@@ -88,7 +87,7 @@ func (pe *paramsEncryptor) GetParams() *Params {
 
 func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime int64) error {
 	if apiType == 0 || imei == "" || firstLaunchTime == 0 {
-		return errs.NewZCAError("invalid params", "createZCID", nil)
+		return fmt.Errorf("invalid params")
 	}
 
 	key := "3FC4F0D2AB50057BCE0D90D9187A22B1"
@@ -106,7 +105,7 @@ func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime
 
 func (pe *paramsEncryptor) createEncryptKey() error {
 	if pe.ZCID == "" || pe.ZCIDExtension == "" {
-		return errs.NewZCAError("invalid params", "createEncryptKey", nil)
+		return fmt.Errorf("invalid params")
 	}
 
 	sum := md5.Sum([]byte(pe.ZCIDExtension))
@@ -123,7 +122,7 @@ func (pe *paramsEncryptor) deriveKey(ext, id string) error {
 	evenE, _ := processStr(ext)
 	evenI, oddI := processStr(id)
 	if len(evenE) == 0 || len(evenI) == 0 || len(oddI) == 0 {
-		return errs.NewZCAError("invalid params", "deriveKey", nil)
+		return fmt.Errorf("invalid params")
 	}
 
 	var b strings.Builder
@@ -206,7 +205,7 @@ func GetEncryptParam(sc session.Context, encryptParams bool, typeStr string) (*E
 	var enc *EncryptedPayload
 	if encryptParams {
 		if e, err := EncryptParam(sc, data); err != nil {
-			return nil, errs.NewZCAError("Failed to encrypt params", "GetEncryptParam", &err)
+			return nil, err
 		} else {
 			enc = e
 		}
@@ -284,5 +283,5 @@ func EncryptParam(sc session.Context, data map[string]any) (*EncryptedPayload, e
 
 // ErrEncryptParams wraps encryption parameter errors
 func ErrEncryptParams(err error) error {
-	return errs.NewZCAError("failed to encrypt params", "EncryptParam", &err)
+	return fmt.Errorf("failed to encrypt params: %w", err)
 }

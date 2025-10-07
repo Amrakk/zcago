@@ -9,6 +9,17 @@ import (
 	"strings"
 )
 
+var (
+	lowerToUpper = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+	acronyms     = regexp.MustCompile(`([A-Z]+)([A-Z][a-z])`)
+)
+
+func PascalToSnake(s string) string {
+	s = lowerToUpper.ReplaceAllString(s, "${1}_${2}")
+	s = acronyms.ReplaceAllString(s, "${1}_${2}")
+	return strings.ToLower(s)
+}
+
 func findMarkerAndIndent(src, marker string) (int, string, error) {
 	reMarker := regexp.MustCompile(`(?m)^([ \t]*)` + regexp.QuoteMeta(marker) + `\s*$`)
 	mLoc := reMarker.FindStringIndex(src)

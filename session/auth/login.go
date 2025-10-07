@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
@@ -41,7 +41,7 @@ func generateLoginParams(sc session.MutableContext, encryptParams bool) (*httpx.
 	encryptedParams, err := httpx.GetEncryptParam(sc, encryptParams, "getlogininfo")
 	if err != nil {
 		logger.Log(sc).Error("Failed to generate encrypted parameters:", err)
-		return nil, err
+		return nil, errs.NewZCA("failed to generate encrypted parameters", "auth.generateLoginParams")
 	}
 	return encryptedParams, nil
 }
@@ -60,7 +60,7 @@ func makeLoginRequest(ctx context.Context, sc session.MutableContext, encryptedP
 		if response != nil {
 			status = response.Status
 		}
-		return nil, errs.NewZCAError("Failed to fetch login info: "+status, "Login", &err)
+		return nil, errs.WrapZCA("Failed to fetch login info: "+status, "auth.makeLoginRequest", err)
 	}
 
 	return response, nil
@@ -70,7 +70,7 @@ func processLoginResponse(sc session.MutableContext, response *http.Response) (*
 	data, err := httpx.ParseBaseResponse(response)
 	if err != nil {
 		logger.Log(sc).Error("Failed to parse login response JSON:", err)
-		return nil, errs.NewZCAError("Failed to decode getLoginInfo response: "+response.Status, "Login", &err)
+		return nil, errs.WrapZCA("Failed to decode getLoginInfo response: "+response.Status, "auth.processLoginResponse", err)
 	}
 
 	return data, nil
@@ -83,12 +83,12 @@ func decryptAndParseLoginData(encryptedParams *httpx.EncryptParamResult, rawData
 
 	dataStr := rawData.Data
 	if dataStr == nil {
-		return nil, errs.NewZCAError("Invalid data format in response", "Login", nil)
+		return nil, errs.NewZCA("Invalid data format in response", "auth.decryptAndParseLoginData")
 	}
 
 	decryptedData, err := decryptLoginResponse(encryptedParams.Enk, dataStr)
 	if err != nil {
-		return nil, errs.NewZCAError("Failed to decrypt response data", "Login", &err)
+		return nil, errs.WrapZCA("Failed to decrypt response data", "auth.decryptAndParseLoginData", err)
 	}
 
 	return decryptedData.Data, nil
@@ -96,7 +96,7 @@ func decryptAndParseLoginData(encryptedParams *httpx.EncryptParamResult, rawData
 
 func decryptLoginResponse(key, data *string) (*httpx.Response[*session.LoginInfo], error) {
 	if key == nil || data == nil {
-		return nil, errs.NewZCAError("key or data is nil", "decryptResp", nil)
+		return nil, errs.NewZCA("key or data is nil", "auth.decryptLoginResponse")
 	}
 
 	u, err := url.PathUnescape(*data)
@@ -139,13 +139,13 @@ func generateServerInfoParams(sc session.MutableContext, encryptParams bool) (ma
 	encryptedParams, err := httpx.GetEncryptParam(sc, encryptParams, "getserverinfo")
 	if err != nil {
 		logger.Log(sc).Error("Failed to generate encrypted parameters for server info:", err)
-		return nil, err
+		return nil, errs.WrapZCA("failed to generate encrypted parameters", "auth.generateServerInfoParams", err)
 	}
 
 	signkey, ok := encryptedParams.Params["signkey"].(string)
 	if !ok || signkey == "" {
 		logger.Log(sc).Error("Missing signkey in encrypted parameters")
-		return nil, errs.NewZCAError("missing signkey", "GetServerInfo", nil)
+		return nil, errs.NewZCA("missing signkey", "auth.generateServerInfoParams")
 	}
 
 	params := map[string]any{
@@ -163,7 +163,7 @@ func makeServerInfoRequest(ctx context.Context, sc session.MutableContext, param
 	u := httpx.MakeURL(sc, "https://wpa.chat.zalo.me/api/login/getServerInfo", params, false)
 	response, err := httpx.Request(ctx, sc, u, nil)
 	if err != nil {
-		return nil, errs.NewZCAError("Failed to fetch server info: "+response.Status, "GetServerInfo", &err)
+		return nil, errs.WrapZCA("Failed to fetch server info: "+response.Status, "auth.makeServerInfoRequest", err)
 	}
 
 	return response, nil
@@ -172,7 +172,7 @@ func makeServerInfoRequest(ctx context.Context, sc session.MutableContext, param
 func parseServerInfoResponse(response *http.Response) (*session.ServerInfo, error) {
 	data, err := httpx.ParseZaloResponse[*session.ServerInfo](response)
 	if err != nil {
-		return nil, errs.NewZCAError("Failed to decode server info response: "+response.Status, "GetServerInfo", &err)
+		return nil, errs.WrapZCA("Failed to decode server info response: "+response.Status, "auth.parseServerInfoResponse", err)
 	}
 
 	return data.Data, nil

@@ -43,11 +43,11 @@ func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
 	var api zcago.API
 	var err error
 
-	if isValidCredentials(cred) {
+	if cred != nil || cred.IsValid() {
 		api, err = a.zalo.Login(ctx, *cred)
 	} else {
 		api, err = a.zalo.LoginQR(ctx, nil, nil)
-		if err == nil && cred == nil {
+		if err == nil {
 			if storeErr := a.storeCredentials(api); storeErr != nil {
 				fmt.Printf("Warning: failed to save credentials: %v\n", storeErr)
 			}
@@ -111,10 +111,6 @@ func (a *App) storeCredentials(api zcago.API) error {
 
 	fmt.Println("Saved credentials to", a.credPath)
 	return nil
-}
-
-func isValidCredentials(c *zcago.Credentials) bool {
-	return c != nil && len(c.Imei) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
 }
 
 func rootDir() string {

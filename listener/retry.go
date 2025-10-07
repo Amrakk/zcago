@@ -6,7 +6,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/internal/websocketx"
@@ -124,7 +124,7 @@ func (ln *listener) rotateEndpoint() error {
 		"t": time.Now().UnixMilli(),
 	}, true)
 	if wsURL == "" {
-		return errs.NewZCAError("build websocket URL failed", "listener.rotateEndpoint", nil)
+		return errs.NewZCA("build websocket URL failed", "listener.rotateEndpoint")
 	}
 	ln.wsURL = wsURL
 	logger.Log(ln.sc).Verbosef(`Rotating endpoint to %s`, ln.wsURL)

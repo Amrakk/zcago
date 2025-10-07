@@ -3,13 +3,13 @@ package httpx
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/errs"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 )
@@ -29,7 +29,7 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 		logger.Log(sc).
 			Warn("Too many redirects, aborting request").
 			Debug("Max redirects exceeded:", maxRedirects)
-		return nil, errs.NewZCAError("too many redirects", "request", nil)
+		return nil, fmt.Errorf("too many redirects")
 	}
 
 	req, err := buildRequest(ctx, sc, urlStr, opt)

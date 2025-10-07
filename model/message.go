@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 )
 
 type UserMessage struct {
@@ -166,7 +166,7 @@ func (c *Content) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	return errs.NewZCAError("Content: data did not match any known content type", "", nil)
+	return errs.NewZCA("Content: data did not match any known content type", "Content.UnmarshalJSON")
 }
 
 func (c Content) MarshalJSON() ([]byte, error) {

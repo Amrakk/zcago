@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/jsonx"
 	"github.com/Amrakk/zcago/session"
@@ -38,7 +38,7 @@ var updateLanguageFactory = apiFactory[UpdateLanguageResponse, UpdateLanguageFn]
 
 			enc, err := u.EncodeAES(jsonx.Stringify(payload))
 			if err != nil {
-				return "", errs.NewZaloAPIError("failed to encrypt params", nil)
+				return "", errs.WrapZCA("failed to encrypt params", "api.UpdateLanguage", err)
 			}
 
 			url := u.MakeURL(url, map[string]any{"params": enc}, true)

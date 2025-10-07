@@ -8,13 +8,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/Amrakk/zcago/internal/errs"
 )
 
 func DecodeResponse(resp *http.Response) (io.ReadCloser, error) {
 	if resp == nil {
-		return nil, errs.NewZCAError("response is nil", "DecodeResponse", nil)
+		return nil, fmt.Errorf("response is nil")
 	}
 
 	contentEncoding := resp.Header.Get("Content-Encoding")
@@ -39,7 +37,7 @@ func ReadJSON(resp *http.Response, target interface{}) error {
 
 	decoder := json.NewDecoder(body)
 	if err := decoder.Decode(target); err != nil {
-		return errs.NewZCAError("failed to decode JSON", "ReadJSON", &err)
+		return fmt.Errorf("failed to decode JSON: %w", err)
 	}
 
 	return nil
@@ -81,7 +79,7 @@ func CheckStatus(resp *http.Response) error {
 	}
 
 	body, _ := ReadString(resp)
-	return errs.NewZCAError(fmt.Sprintf("Status %d: %s", resp.StatusCode, body), "", nil)
+	return fmt.Errorf("status %d: %s", resp.StatusCode, body)
 }
 
 type Response[T any] struct {

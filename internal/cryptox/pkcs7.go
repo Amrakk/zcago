@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	ErrInvalidBlockSize    = errors.New("invalid block size")
-	ErrInvalidPKCS7Data    = errors.New("invalid PKCS#7 data")
-	ErrInvalidPKCS7Padding = errors.New("invalid PKCS#7 padding")
+	ErrInvalidBlockSize    = errors.New("cryptox: invalid block size")
+	ErrInvalidPKCS7Data    = errors.New("cryptox: invalid PKCS#7 data")
+	ErrInvalidPKCS7Padding = errors.New("cryptox: invalid PKCS#7 padding")
 )
 
 func Pkcs7Padding(data []byte, blockSize int) ([]byte, error) {

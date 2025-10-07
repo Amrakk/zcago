@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/jsonx"
 	"github.com/Amrakk/zcago/model"
@@ -49,7 +49,7 @@ var getUserInfoFactory = apiFactory[*GetUserInfoResponse, GetUserInfoFn]()(
 
 			enc, err := u.EncodeAES(jsonx.Stringify(payload))
 			if err != nil {
-				return nil, errs.NewZaloAPIError("failed to encrypt params", nil)
+				return nil, errs.WrapZCA("failed to encrypt params", "api.GetUserInfo", err)
 			}
 
 			body := httpx.BuildFormBody(map[string]string{"params": enc})

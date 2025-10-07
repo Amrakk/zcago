@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Amrakk/zcago/internal/errs"
+	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/websocketx"
 	"github.com/Amrakk/zcago/model"
@@ -24,7 +24,7 @@ const (
 
 type Listener interface {
 	Start(ctx context.Context, retryOnClose bool) error
-	Stop() error
+	Stop()
 
 	// Channels
 	Connected() <-chan struct{}
@@ -111,43 +111,16 @@ func New(sc session.MutableContext, urls []string) (*listener, error) {
 	}, nil
 }
 
-func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.Client, error) {
-	u, err := url.Parse(ln.wsURL)
-	if err != nil {
-		return nil, errs.NewZCAError("parse websocket URL failed", "listener.Start", &err)
-	}
-
-	h := make(http.Header)
-	h.Set("accept-encoding", "gzip, deflate, br, zstd")
-	h.Set("accept-language", "en-US,en;q=0.9")
-	h.Set("cache-control", "no-cache")
-	h.Set("host", u.Host)
-	h.Set("origin", "https://chat.zalo.me")
-	h.Set("pragma", "no-cache")
-	h.Set("user-agent", ln.userAgent)
-	h.Set("cookie", ln.cookie)
-
-	client, err := websocketx.Dial(ctx, ln.wsURL, &websocketx.Options{
-		Header: h,
-		Proxy:  ln.sc.Proxy(),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
-}
-
 func (ln *listener) Start(ctx context.Context, retryOnClose bool) error {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
 	if ln.client != nil {
-		return errs.NewZCAError("Already started", "listener.Start", nil)
+		return errs.NewZCA("Already started", "listener.Start")
 	}
 	if ctx.Err() != nil {
 		err := ctx.Err()
-		return errs.NewZCAError("context cancelled", "listener.Start", &err)
+		return errs.WrapZCA("context cancelled", "listener.Start", err)
 	}
 
 	ln.ctx = ctx
@@ -167,6 +140,33 @@ func (ln *listener) Start(ctx context.Context, retryOnClose bool) error {
 	go ln.run(retryOnClose)
 
 	return nil
+}
+
+func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.Client, error) {
+	u, err := url.Parse(ln.wsURL)
+	if err != nil {
+		return nil, errs.WrapZCA("parse websocket URL failed", "listener.createWebSocketConnection", err)
+	}
+
+	h := make(http.Header)
+	h.Set("accept-encoding", "gzip, deflate, br, zstd")
+	h.Set("accept-language", "en-US,en;q=0.9")
+	h.Set("cache-control", "no-cache")
+	h.Set("host", u.Host)
+	h.Set("origin", "https://chat.zalo.me")
+	h.Set("pragma", "no-cache")
+	h.Set("user-agent", ln.userAgent)
+	h.Set("cookie", ln.cookie)
+
+	client, err := websocketx.Dial(ctx, ln.wsURL, &websocketx.Options{
+		Header: h,
+		Proxy:  ln.sc.Proxy(),
+	})
+	if err != nil {
+		return nil, errs.WrapZCA("websocket dial failed", "listener.createWebSocketConnection", err)
+	}
+
+	return client, nil
 }
 
 func (ln *listener) run(retryOnClose bool) {
@@ -230,7 +230,7 @@ func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.Clo
 
 	if ln.shouldRetryConnection(ctx, ci, retryOnClose) {
 		if err := ln.scheduleReconnection(ci); err != nil {
-			ln.emitError(ctx, errs.NewZCAError("Failed to schedule reconnection:", "handleConnectionClose", &err))
+			ln.emitError(ctx, errs.WrapZCA("failed to schedule reconnection:", "listener.handleConnectionClose", err))
 			ln.emitClosed(ctx, ci)
 		}
 	} else {
@@ -238,19 +238,17 @@ func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.Clo
 	}
 }
 
-func (ln *listener) Stop() error {
+func (ln *listener) Stop() {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
 
 	if ln.client == nil {
-		return nil
+		return
 	}
 
 	client := ln.client
 	ln.reset()
 	client.Close(ZaloManualClosure, "")
-
-	return nil
 }
 
 func (ln *listener) reset() {
@@ -270,16 +268,16 @@ func (ln *listener) reset() {
 
 func validateInputs(sc session.MutableContext, urls []string) error {
 	if sc == nil {
-		return errs.NewZCAError("context is nil", "listener.New", nil)
+		return errs.NewZCA("context is nil", "listener.validateInputs")
 	}
 	if sc.CookieJar() == nil {
-		return errs.NewZCAError("cookie jar is not available", "listener.New", nil)
+		return errs.NewZCA("cookie jar is not available", "listener.validateInputs")
 	}
 	if ua := sc.UserAgent(); ua == "" {
-		return errs.NewZCAError("user-agent is not available", "listener.New", nil)
+		return errs.NewZCA("user-agent is not available", "listener.validateInputs")
 	}
 	if len(urls) == 0 || urls[0] == "" {
-		return errs.NewZCAError("websocket URL list is empty", "listener.New", nil)
+		return errs.NewZCA("websocket URL list is empty", "listener.validateInputs")
 	}
 	return nil
 }
@@ -289,7 +287,7 @@ func buildWebSocketURL(sc session.MutableContext, url string) (string, error) {
 		"t": time.Now().UnixMilli(),
 	}, true)
 	if wsURL == "" {
-		return "", errs.NewZCAError("build websocket URL failed", "listener.New", nil)
+		return "", errs.NewZCA("build websocket URL failed", "listener.buildWebSocketURL")
 	}
 	return wsURL, nil
 }

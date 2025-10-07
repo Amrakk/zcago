@@ -8,8 +8,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-
-	"github.com/Amrakk/zcago/internal/strx"
 )
 
 type Config struct {
@@ -75,7 +73,7 @@ func createEndpointFile(cfg *Config) error {
 		return fmt.Errorf("creating api dir: %w", err)
 	}
 
-	snake := strx.PascalToSnake(cfg.Name)
+	snake := PascalToSnake(cfg.Name)
 	dst := filepath.Join(cfg.ApiDir, snake+".go")
 
 	if _, err := os.Stat(dst); err == nil {
