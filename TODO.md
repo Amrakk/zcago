@@ -2,7 +2,6 @@
 
 ## High Priority
 
--   **Error Handling Improvements** - Better error types and handling
 -   **Context Handling** - Verify context flow
 -   **SendMessage API** - Core messaging functionality
 
