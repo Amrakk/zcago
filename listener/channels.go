@@ -97,8 +97,10 @@ func (ln *listener) emitClosed(ctx context.Context, ci websocketx.CloseInfo) {
 //
 // This policy ensures that slow or absent receivers do not block the sender,
 // at the cost of possibly overwriting or dropping messages.
-func emit[T any](ch chan T, obj T) {
+func emit[T any](ctx context.Context, ch chan T, obj T) {
 	select {
+	case <-ctx.Done():
+		return
 	case ch <- obj:
 	default:
 		select {

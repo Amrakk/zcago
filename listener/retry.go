@@ -18,18 +18,15 @@ type retryState struct {
 	times []int
 }
 
-func (ln *listener) shouldRetryConnection(ctx context.Context, ci websocketx.CloseInfo, retryOnClose bool) bool {
+func (ln *listener) shouldRetryConnection(ctx context.Context, ci websocketx.CloseInfo, retryOnClose bool) (int, bool) {
 	if !retryOnClose || ctx.Err() != nil {
-		return false
+		return 0, false
 	}
 
-	_, allowed := ln.canRetry(ci.Code)
-	return allowed
+	return ln.canRetry(ci.Code)
 }
 
-func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) error {
-	delay, _ := ln.canRetry(ci.Code)
-
+func (ln *listener) scheduleReconnection(ctx context.Context, ci websocketx.CloseInfo, delay int) error {
 	if ln.shouldRotate(ci.Code) {
 		if err := ln.rotateEndpoint(); err != nil {
 			return err
@@ -37,13 +34,13 @@ func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) error {
 	}
 
 	time.AfterFunc(time.Duration(delay)*time.Millisecond, func() {
-		ln.mu.RLock()
-		stored := ln.ctx
-		ln.mu.RUnlock()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
-		if stored != nil && stored.Err() == nil {
-			_ = ln.Start(stored, true)
-		} else {
+		if err := ln.Start(ctx, true); err != nil {
 			select {
 			case ln.ch.Closed <- ci:
 			default:
@@ -57,7 +54,7 @@ func (ln *listener) scheduleReconnection(ci websocketx.CloseInfo) error {
 func (ln *listener) canRetry(code int) (int, bool) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
-
+	
 	if !ln.shouldRetry(code) {
 		return 0, false
 	}
@@ -99,6 +96,7 @@ func (ln *listener) shouldRetry(code int) bool {
 	if s == nil || s.Features.Socket.CloseAndRetry == nil {
 		return false
 	}
+
 	return slices.Contains(s.Features.Socket.CloseAndRetry, code)
 }
 

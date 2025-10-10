@@ -51,7 +51,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 		return errs.WrapZCA("failed to encode frame", "listener.SendWS", err)
 	}
 
-	client.Write(websocketx.BinaryMessage, frame)
+	client.Write(ctx, websocketx.BinaryMessage, frame)
 
 	return nil
 }
@@ -108,12 +108,6 @@ func (ln *listener) validateSendRequest(ctx context.Context) error {
 	return nil
 }
 
-func (ln *listener) getClient() websocketx.Client {
-	ln.mu.RLock()
-	defer ln.mu.RUnlock()
-	return ln.client
-}
-
 func (ln *listener) addRequestID(p *WSPayload) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
@@ -146,7 +140,7 @@ func (ln *listener) handleWebSocketMessage(ctx context.Context, msg websocketx.M
 		return
 	}
 
-	ln.router(uint(version), uint(cmd), uint(subCMD), parsed)
+	ln.router(ctx, uint(version), uint(cmd), uint(subCMD), parsed)
 }
 
 func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {

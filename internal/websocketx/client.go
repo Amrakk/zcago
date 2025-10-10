@@ -5,12 +5,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/coder/websocket"
 )
 
 const (
-	TextMessage   = websocket.TextMessage
-	BinaryMessage = websocket.BinaryMessage
+	TextMessage   = websocket.MessageText
+	BinaryMessage = websocket.MessageBinary
 )
 
 type Client interface {
@@ -18,14 +18,14 @@ type Client interface {
 	Errors() <-chan error
 	Closed() <-chan CloseInfo
 
-	Write(typ int, data []byte)
-	WriteText(s string)
+	Write(ctx context.Context, typ websocket.MessageType, data []byte) error
+	WriteText(ctx context.Context, s string) error
 
 	Close(code int, reason string)
 }
 
 type Message struct {
-	Type int
+	Type websocket.MessageType
 	Data []byte
 }
 
@@ -35,17 +35,24 @@ type CloseInfo struct {
 	Err    error
 }
 
-type client struct {
-	conn   *websocket.Conn
+type writeRequest struct {
 	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	once   sync.Once
+	typ    websocket.MessageType
+	data   []byte
+	result chan error
+}
+
+type client struct {
+	conn    *websocket.Conn
+	connCtx context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	once    sync.Once
 
 	msgChan    chan Message
 	errChan    chan error
 	closedChan chan CloseInfo
-	writeQueue chan Message
+	writeQueue chan writeRequest
 }
 
 var _ Client = (*client)(nil)
@@ -53,9 +60,6 @@ var _ Client = (*client)(nil)
 func Dial(ctx context.Context, url string, opt *Options) (*client, error) {
 	cfg := defaultOptions()
 	if opt != nil {
-		if opt.Proxy != nil {
-			cfg.Proxy = opt.Proxy
-		}
 		if opt.Header != nil {
 			cfg.Header = opt.Header
 		}
@@ -70,36 +74,37 @@ func Dial(ctx context.Context, url string, opt *Options) (*client, error) {
 		}
 	}
 
-	dialer := websocket.Dialer{
-		Proxy:             cfg.Proxy,
-		EnableCompression: true,
+	dialOpts := &websocket.DialOptions{
+		HTTPHeader: cfg.Header,
 	}
 
-	ws, _, err := dialer.Dial(url, cfg.Header)
+	if cfg.HTTPClient != nil {
+		dialOpts.HTTPClient = cfg.HTTPClient
+	}
+
+	conn, _, err := websocket.Dial(ctx, url, dialOpts)
 	if err != nil {
 		return nil, err
 	}
 
-	ws.SetReadLimit(-1)
-
 	cctx, cancel := context.WithCancel(ctx)
 	cl := &client{
-		conn:       ws,
-		ctx:        cctx,
+		conn:       conn,
+		connCtx:    cctx,
 		cancel:     cancel,
 		msgChan:    make(chan Message, cfg.MsgBuf),
 		errChan:    make(chan error, cfg.ErrBuf),
 		closedChan: make(chan CloseInfo, 1),
-		writeQueue: make(chan Message, cfg.WriteBuf),
+		writeQueue: make(chan writeRequest, cfg.WriteBuf),
 	}
 
 	// Reader
 	cl.wg.Add(1)
-	go cl.readLoop()
+	go cl.readLoop(cctx)
 
 	// Writer
 	cl.wg.Add(1)
-	go cl.writeLoop()
+	go cl.writeLoop(cctx)
 
 	return cl, nil
 }
@@ -108,50 +113,81 @@ func (c *client) Messages() <-chan Message { return c.msgChan }
 func (c *client) Errors() <-chan error     { return c.errChan }
 func (c *client) Closed() <-chan CloseInfo { return c.closedChan }
 
-func (c *client) Write(typ int, data []byte) {
+func (c *client) Write(ctx context.Context, typ websocket.MessageType, data []byte) error {
+	req := writeRequest{
+		ctx:    ctx,
+		typ:    typ,
+		data:   data,
+		result: make(chan error, 1),
+	}
+
 	select {
-	case c.writeQueue <- Message{Type: typ, Data: data}:
-	case <-c.ctx.Done():
-		c.handleErr(context.Canceled)
+	case c.writeQueue <- req:
+		select {
+		case err := <-req.result:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 
-func (c *client) WriteText(s string) {
-	c.Write(websocket.TextMessage, []byte(s))
+func (c *client) WriteText(ctx context.Context, s string) error {
+	return c.Write(ctx, websocket.MessageText, []byte(s))
 }
 
 func (c *client) Close(code int, reason string) {
 	c.shutdown(CloseInfo{Code: code, Reason: reason}, true)
 }
 
-func (c *client) readLoop() {
+func (c *client) readLoop(ctx context.Context) {
 	defer c.wg.Done()
+
 	for {
-		typ, data, err := c.conn.ReadMessage()
-		if err != nil {
-			c.shutdown(closeInfoFromErr(err), false)
+		select {
+		case <-ctx.Done():
 			return
+		default:
 		}
+
+		typ, data, err := c.conn.Read(ctx)
+		if err != nil {
+			if c.isFatalErr(err) {
+				c.shutdown(closeInfoFromErr(err), false)
+				return
+			} else {
+				c.handleErr(err)
+				continue
+			}
+		}
+
 		switch typ {
-		case websocket.TextMessage, websocket.BinaryMessage:
+		case websocket.MessageText, websocket.MessageBinary:
 			c.handleMsg(Message{Type: typ, Data: data})
 		}
 	}
 }
 
-func (c *client) writeLoop() {
+func (c *client) writeLoop(ctx context.Context) {
 	defer c.wg.Done()
+
 	for {
 		select {
-		case <-c.ctx.Done():
+		case <-ctx.Done():
 			return
-		case msg := <-c.writeQueue:
-			if err := c.conn.WriteMessage(msg.Type, msg.Data); err != nil {
-				if isFatalWriteErr(err) {
-					c.shutdown(closeInfoFromErr(err), false)
-					return
-				}
-				c.handleErr(err)
+		case req := <-c.writeQueue:
+			err := c.conn.Write(req.ctx, req.typ, req.data)
+
+			select {
+			case req.result <- err:
+			default:
+			}
+
+			if err != nil && c.isFatalErr(err) {
+				c.shutdown(closeInfoFromErr(err), false)
+				return
 			}
 		}
 	}
@@ -161,9 +197,12 @@ func (c *client) shutdown(ci CloseInfo, sendCloseFrame bool) {
 	c.once.Do(func() {
 		c.pushClose(ci)
 		if sendCloseFrame {
-			_ = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(ci.Code, ci.Reason), time.Now().Add(2*time.Second))
+			_, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			_ = c.conn.Close(websocket.StatusCode(ci.Code), ci.Reason)
+		} else {
+			_ = c.conn.CloseNow()
 		}
-		_ = c.conn.Close()
 		c.cancel()
 		go func() {
 			c.wg.Wait()

@@ -72,7 +72,8 @@ type listener struct {
 	selfListen  bool
 	pingStopper *func()
 
-	ctx context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 var _ Listener = (*listener)(nil)
@@ -123,10 +124,12 @@ func (ln *listener) Start(ctx context.Context, retryOnClose bool) error {
 		return errs.WrapZCA("context cancelled", "listener.Start", err)
 	}
 
-	ln.ctx = ctx
+	lctx, cancel := context.WithCancel(ctx)
+	ln.cancel = cancel
 
-	client, err := ln.createWebSocketConnection(ctx)
+	client, err := ln.createWebSocketConnection(lctx)
 	if err != nil {
+		cancel()
 		return err
 	}
 
@@ -137,7 +140,8 @@ func (ln *listener) Start(ctx context.Context, retryOnClose bool) error {
 	default:
 	}
 
-	go ln.run(retryOnClose)
+	ln.wg.Add(1)
+	go ln.run(lctx, retryOnClose)
 
 	return nil
 }
@@ -159,8 +163,8 @@ func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.C
 	h.Set("cookie", ln.cookie)
 
 	client, err := websocketx.Dial(ctx, ln.wsURL, &websocketx.Options{
-		Header: h,
-		Proxy:  ln.sc.Proxy(),
+		Header:     h,
+		HTTPClient: ln.sc.Client(),
 	})
 	if err != nil {
 		return nil, errs.WrapZCA("websocket dial failed", "listener.createWebSocketConnection", err)
@@ -169,14 +173,13 @@ func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.C
 	return client, nil
 }
 
-func (ln *listener) run(retryOnClose bool) {
+func (ln *listener) run(ctx context.Context, retryOnClose bool) {
+	defer ln.wg.Done()
+
 	cl := ln.getClient()
 	if cl == nil {
 		return
 	}
-
-	ctx, cancel := context.WithCancel(ln.ctx)
-	defer cancel()
 
 	errsCh := cl.Errors()
 	msgsCh := cl.Messages()
@@ -217,8 +220,6 @@ func (ln *listener) run(retryOnClose bool) {
 }
 
 func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.CloseInfo, retryOnClose bool) {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
 	ln.reset()
 
 	select {
@@ -228,38 +229,61 @@ func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.Clo
 	default:
 	}
 
-	if ln.shouldRetryConnection(ctx, ci, retryOnClose) {
-		if err := ln.scheduleReconnection(ci); err != nil {
+	if delay, ok := ln.shouldRetryConnection(ctx, ci, retryOnClose); ok {
+		if err := ln.scheduleReconnection(ctx, ci, delay); err != nil {
 			ln.emitError(ctx, errs.WrapZCA("failed to schedule reconnection:", "listener.handleConnectionClose", err))
 			ln.emitClosed(ctx, ci)
+			ln.cancelActiveContext()
 		}
-	} else {
-		ln.emitClosed(ctx, ci)
+		return
+	}
+
+	ln.emitClosed(ctx, ci)
+	ln.cancelActiveContext()
+}
+
+func (ln *listener) cancelActiveContext() {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	if ln.cancel != nil {
+		ln.cancel()
+		ln.cancel = nil
 	}
 }
 
 func (ln *listener) Stop() {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
-
-	if ln.client == nil {
+	client := ln.getClient()
+	if client == nil {
 		return
 	}
 
-	client := ln.client
-	ln.reset()
+	ln.cancelActiveContext()
 	client.Close(ZaloManualClosure, "")
+
+	ln.wg.Wait()
 }
 
 func (ln *listener) reset() {
-	ln.client = nil
-	ln.reqID = 0
-	ln.cipherKey = ""
-	ln.ctx = nil
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+
 	if ln.pingStopper != nil {
 		(*ln.pingStopper)()
 		ln.pingStopper = nil
 	}
+
+	if ln.client != nil {
+		ln.client = nil
+	}
+
+	ln.reqID = 0
+	ln.cipherKey = ""
+}
+
+func (ln *listener) getClient() websocketx.Client {
+	ln.mu.RLock()
+	defer ln.mu.RUnlock()
+	return ln.client
 }
 
 //

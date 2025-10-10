@@ -18,7 +18,7 @@ type messageOrUndo struct {
 
 func (m *messageOrUndo) UnmarshalJSON(data []byte) error {
 	var tu model.TUndo
-	if err := json.Unmarshal(data, &tu); err == nil && tu.MsgID != "" {
+	if err := json.Unmarshal(data, &tu); err == nil && tu.MsgID != "" && tu.MsgType == "chat.undo" {
 		m.Undo = &tu
 		return nil
 	}

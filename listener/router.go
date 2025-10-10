@@ -11,15 +11,15 @@ import (
 	"github.com/Amrakk/zcago/model"
 )
 
-func (ln *listener) router(version, cmd, sub uint, body BaseWSMessage) {
+func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body BaseWSMessage) {
 	key := fmt.Sprintf("%d_%d_%d", version, cmd, sub)
 
 	switch key {
 	case "1_1_1":
-		ln.handleCipherKey(body)
+		ln.handleCipherKey(ctx, body)
 
 	case "1_501_0":
-		ln.handleMessages(body)
+		ln.handleMessages(ctx, body)
 
 	case "1_3000_0":
 		ln.handleDuplicateConnection()
@@ -28,7 +28,7 @@ func (ln *listener) router(version, cmd, sub uint, body BaseWSMessage) {
 	}
 }
 
-func (ln *listener) handleCipherKey(body BaseWSMessage) {
+func (ln *listener) handleCipherKey(ctx context.Context, body BaseWSMessage) {
 	key := *body.Key
 	if key == "" {
 		return
@@ -48,8 +48,8 @@ func (ln *listener) handleCipherKey(body BaseWSMessage) {
 			SubCMD:  1,
 			Data:    map[string]any{"eventId": time.Now().UnixMilli()},
 		}
-		if err := ln.SendWS(ln.ctx, payload, false); err != nil {
-			ln.emitError(ln.ctx, errs.WrapZCA("failed to send ping:", "ping", err))
+		if err := ln.SendWS(ctx, payload, false); err != nil {
+			ln.emitError(ctx, errs.WrapZCA("failed to send ping:", "ping", err))
 		}
 	}
 
@@ -58,15 +58,15 @@ func (ln *listener) handleCipherKey(body BaseWSMessage) {
 		return
 	}
 
-	stop := startPingLoop(ln.ctx, interval, ping)
+	stop := startPingLoop(ctx, interval, ping)
 	ln.pingStopper = &stop
 }
 
-func (ln *listener) handleMessages(body BaseWSMessage) {
+func (ln *listener) handleMessages(ctx context.Context, body BaseWSMessage) {
 	eventData, err := decodeEventData[events.MessageEventData](body, ln.cipherKey)
 	if err != nil {
 		err = errs.WrapZCA("Failed to decode event data:", "listener.handleMessages", err)
-		ln.emitError(ln.ctx, err)
+		ln.emitError(ctx, err)
 		return
 	}
 
@@ -76,13 +76,13 @@ func (ln *listener) handleMessages(body BaseWSMessage) {
 			if undoObject.IsSelf && !ln.selfListen {
 				continue
 			}
-			emit(ln.ch.Undo, undoObject)
+			emit(ctx, ln.ch.Undo, undoObject)
 		} else if msg.Message != nil {
 			messageObject := model.NewUserMessage(ln.sc.UID(), *msg.Message)
 			if messageObject.IsSelf && !ln.selfListen {
 				continue
 			}
-			emit(ln.ch.Message, messageObject)
+			emit(ctx, ln.ch.Message, messageObject)
 		}
 	}
 }
@@ -91,7 +91,11 @@ func (ln *listener) handleDuplicateConnection() {
 	logger.Log(ln.sc).Error()
 	logger.Log(ln.sc).Error("Another connection is opened, closing this one")
 	logger.Log(ln.sc).Error()
-	ln.client.Close(ZaloDuplicateConnection, "Another connection is opened, closing this one")
+
+	client := ln.getClient()
+	if client != nil {
+		client.Close(ZaloDuplicateConnection, "Another connection is opened, closing this one")
+	}
 }
 
 //
@@ -112,7 +116,6 @@ func startPingLoop(ctx context.Context, interval time.Duration, f func()) func()
 			case <-ticker.C:
 				f()
 			case <-done:
-				ticker.Stop()
 				return
 			}
 		}

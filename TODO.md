@@ -2,7 +2,6 @@
 
 ## High Priority
 
--   **Context Handling** - Verify context flow
 -   **SendMessage API** - Core messaging functionality
 
 ## Low Priority
