@@ -87,6 +87,7 @@ func getDefaultHeaders(sc session.Context, origin string) (http.Header, error) {
 	return h, nil
 }
 
+// TODO: remove this after implementing a custom cookie jar
 func cookieString(cookies []*http.Cookie) string {
 	if len(cookies) == 0 {
 		return ""

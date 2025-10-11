@@ -242,15 +242,6 @@ func (ln *listener) handleConnectionClose(ctx context.Context, ci websocketx.Clo
 	ln.cancelActiveContext()
 }
 
-func (ln *listener) cancelActiveContext() {
-	ln.mu.Lock()
-	defer ln.mu.Unlock()
-	if ln.cancel != nil {
-		ln.cancel()
-		ln.cancel = nil
-	}
-}
-
 func (ln *listener) Stop() {
 	client := ln.getClient()
 	if client == nil {
@@ -280,15 +271,24 @@ func (ln *listener) reset() {
 	ln.cipherKey = ""
 }
 
+func (ln *listener) cancelActiveContext() {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+	if ln.cancel != nil {
+		ln.cancel()
+		ln.cancel = nil
+	}
+}
+
 func (ln *listener) getClient() websocketx.Client {
 	ln.mu.RLock()
 	defer ln.mu.RUnlock()
 	return ln.client
 }
 
-//
+// ----------------------------------------
 // Constructor helpers
-//
+// ----------------------------------------
 
 func validateInputs(sc session.MutableContext, urls []string) error {
 	if sc == nil {
@@ -316,6 +316,7 @@ func buildWebSocketURL(sc session.MutableContext, url string) (string, error) {
 	return wsURL, nil
 }
 
+// TODO: remove this after implementing a custom cookie jar
 func buildCookieString(cookies []*http.Cookie) string {
 	if len(cookies) == 0 {
 		return ""

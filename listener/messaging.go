@@ -28,9 +28,9 @@ type WSMessage[T any] struct {
 
 type BaseWSMessage = WSMessage[string]
 
-//
+// ----------------------------------------
 // WebSocket sending utilities
-//
+// ----------------------------------------
 
 func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) error {
 	if err := ln.validateSendRequest(ctx); err != nil {
@@ -119,9 +119,9 @@ func (ln *listener) addRequestID(p *WSPayload) {
 	ln.reqID++
 }
 
-//
+// ----------------------------------------
 // Websocket reading utilities
-//
+// ----------------------------------------
 
 func (ln *listener) handleWebSocketMessage(ctx context.Context, msg websocketx.Message) {
 	if msg.Type != websocketx.BinaryMessage {
@@ -151,7 +151,7 @@ func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {
 	header := make([]byte, 4)
 	copy(header, data[:4])
 
-	version, cmd, subCMD, err := getHeader(header)
+	version, cmd, subCMD, err := getMessageHeader(header)
 	if err != nil {
 		return 0, 0, 0, nil, err
 	}
@@ -164,7 +164,7 @@ func parseWebSocketMessage(data []byte) (byte, uint16, byte, []byte, error) {
 	return version, cmd, subCMD, msgData, nil
 }
 
-func getHeader(buffer []byte) (byte, uint16, byte, error) {
+func getMessageHeader(buffer []byte) (byte, uint16, byte, error) {
 	if len(buffer) < 4 {
 		return 0, 0, 0, errs.NewZCA("invalid header", "listener.getHeader")
 	}

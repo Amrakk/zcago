@@ -171,7 +171,9 @@ func (c *contextImpl) ExtraVer() *ExtraVer   { return c.extraVer }
 
 func (c *contextImpl) SecretKey() SecretKey { return c.secretKey }
 
-// TODO: fix this
+// BUG: get cookies for specific domains not working
+//
+// TODO: implement a custom cookie jar
 func (c *contextImpl) Cookies(domains ...string) []*http.Cookie {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
