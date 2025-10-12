@@ -12,7 +12,7 @@ import (
 )
 
 type Credentials struct {
-	Imei      string      `json:"imei"`
+	IMEI      string      `json:"imei"`
 	Cookie    CookieUnion `json:"cookie"`
 	UserAgent string      `json:"userAgent"`
 	Language  *string     `json:"language,omitempty"`
@@ -20,7 +20,7 @@ type Credentials struct {
 
 func NewCredentials(imei string, cookie CookieUnion, userAgent string, language *string) Credentials {
 	return Credentials{
-		Imei:      imei,
+		IMEI:      imei,
 		Cookie:    cookie,
 		UserAgent: userAgent,
 		Language:  language,
@@ -28,7 +28,7 @@ func NewCredentials(imei string, cookie CookieUnion, userAgent string, language 
 }
 
 func (c Credentials) IsValid() bool {
-	return len(c.Imei) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
+	return len(c.IMEI) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
 }
 
 type SameSite string

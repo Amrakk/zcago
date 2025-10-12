@@ -43,7 +43,7 @@ func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
 	var api zcago.API
 	var err error
 
-	if cred != nil || cred.IsValid() {
+	if cred != nil && cred.IsValid() {
 		api, err = a.zalo.Login(ctx, *cred)
 	} else {
 		api, err = a.zalo.LoginQR(ctx, nil, nil)

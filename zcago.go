@@ -2,8 +2,11 @@ package zcago
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"net/url"
 
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Amrakk/zcago/api"
@@ -16,7 +19,7 @@ import (
 
 type Zalo interface {
 	Login(ctx context.Context, cred Credentials) (API, error)
-	LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallback) (API, error)
+	LoginQR(ctx context.Context, opt *LoginQROption, cb LoginQRCallback) (API, error)
 }
 
 type zalo struct {
@@ -34,13 +37,59 @@ func NewZalo(opts ...session.Option) Zalo {
 }
 
 func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
-	appCtx := session.NewContext(z.opts...)
+	sc := session.NewContext(z.opts...)
 
-	return z.loginCookie(ctx, appCtx, cred)
+	return z.loginCookie(ctx, sc, cred)
 }
 
-func (z *zalo) LoginQR(ctx context.Context, opt *LoginQROption, cb *LoginQRCallback) (API, error) {
-	panic("unimplemented")
+func (z *zalo) LoginQR(ctx context.Context, opts *LoginQROption, cb LoginQRCallback) (API, error) {
+	const defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
+
+	options := LoginQROption{
+		UserAgent: defaultUA,
+		Language:  "vi",
+	}
+	if opts != nil {
+		if opts.UserAgent != "" {
+			options.UserAgent = opts.UserAgent
+		}
+		if opts.Language != "" {
+			options.Language = opts.Language
+		}
+		options.QRPath = opts.QRPath
+	}
+
+	sc := session.NewContext(z.opts...)
+	sc.SetUserAgent(options.UserAgent)
+
+	res, err := loginQR(ctx, sc, options.QRPath, cb)
+	if err != nil {
+		logger.Log(sc).Error(err)
+		return nil, err
+	} else if res == nil {
+		return nil, errs.WrapZCA("unable to login with QR code", "zalo.LoginQR", err)
+	}
+
+	imei := generateZaloUUID(options.UserAgent)
+
+	if cb != nil {
+		cb(auth.EventGotLoginInfo{
+			Data: auth.QRGotLoginInfoData{
+				Cookie:    res.Cookies,
+				IMEI:      imei,
+				UserAgent: options.UserAgent,
+			},
+		})
+	}
+
+	cred := Credentials{
+		IMEI:      imei,
+		UserAgent: options.UserAgent,
+		Language:  &options.Language,
+		Cookie:    NewHTTPCookie(res.Cookies),
+	}
+
+	return z.loginCookie(ctx, sc, cred)
 }
 
 func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred Credentials) (API, error) {
@@ -52,13 +101,16 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	if cred.Language != nil && *cred.Language != "" {
 		lang = *cred.Language
 	}
-	sc.SetIMEI(cred.Imei)
+	sc.SetIMEI(cred.IMEI)
 	sc.SetLanguage(lang)
 	sc.SetUserAgent(cred.UserAgent)
 
 	u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
-	jar := cred.Cookie.BuildCookieJar(&u)
-	sc.SetCookieJar(jar)
+
+	if len(sc.Cookies()) == 0 {
+		jar := cred.Cookie.BuildCookieJar(&u)
+		sc.SetCookieJar(jar)
+	}
 
 	var (
 		loginInfo  *session.LoginInfo
@@ -74,7 +126,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	})
 
 	g.Go(func() error {
-		li, err := auth.Login(gctx, sc, z.enableEncryptParam)
+		li, err := login(gctx, sc, z.enableEncryptParam)
 		if err != nil {
 			logger.Log(sc).Error("Login failed", err)
 			return err
@@ -84,7 +136,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	})
 
 	g.Go(func() error {
-		si, err := auth.GetServerInfo(gctx, sc, z.enableEncryptParam)
+		si, err := getServerInfo(gctx, sc, z.enableEncryptParam)
 		if err != nil {
 			logger.Log(sc).Error("Failed to get server info:", err)
 			return err
@@ -105,7 +157,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 
 	sc.SealLogin(session.Seal{
 		UID:       loginInfo.UID,
-		IMEI:      cred.Imei,
+		IMEI:      cred.IMEI,
 		UserAgent: cred.UserAgent,
 		Language:  lang,
 		SecretKey: secretKey,
@@ -116,4 +168,10 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 
 	logger.Log(sc).Success("Successfully logged in as ", sc.UID())
 	return api.New(sc)
+}
+
+func generateZaloUUID(userAgent string) string {
+	u := uuid.New().String()
+	hash := md5.Sum([]byte(userAgent))
+	return u + "-" + hex.EncodeToString(hash[:])
 }

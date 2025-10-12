@@ -1,6 +1,7 @@
 package zcago
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/Amrakk/zcago/session"
@@ -8,9 +9,27 @@ import (
 )
 
 type (
-	LoginQROption   auth.LoginQROption
+	LoginQREvent    auth.LoginQREvent
 	LoginQRCallback auth.LoginQRCallback
 )
+
+type LoginQROption struct {
+	UserAgent string
+	Language  string
+	QRPath    string
+}
+
+func login(ctx context.Context, sc session.MutableContext, encryptParams bool) (*session.LoginInfo, error) {
+	return auth.Login(ctx, sc, encryptParams)
+}
+
+func getServerInfo(ctx context.Context, sc session.MutableContext, enableEncryptParam bool) (*session.ServerInfo, error) {
+	return auth.GetServerInfo(ctx, sc, enableEncryptParam)
+}
+
+func loginQR(ctx context.Context, sc session.MutableContext, qrPath string, cb LoginQRCallback) (*auth.LoginQRResult, error) {
+	return auth.LoginQR(ctx, sc, qrPath, auth.LoginQRCallback(cb))
+}
 
 func WithSelfListen(v bool) session.Option  { return session.WithSelfListen(v) }
 func WithCheckUpdate(v bool) session.Option { return session.WithCheckUpdate(v) }

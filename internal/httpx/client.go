@@ -42,13 +42,13 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 		return nil, err
 	}
 
-	origin := getOrigin(urlStr)
-	handleCookies(sc, resp, origin, opt)
+	// origin := getOrigin(urlStr)
+	// handleCookies(sc, resp, origin, opt)
 
 	if loc := resp.Header.Get("Location"); loc != "" {
 		logger.Log(sc).
-			Debug("Following redirect to:", loc).
-			Verbose("Redirect depth:", depth+1)
+			Debug("Following redirect to: ", loc).
+			Verbose("Redirect depth: ", depth+1)
 
 		func(b io.ReadCloser) {
 			if _, err := io.Copy(io.Discard, b); err != nil {
@@ -94,6 +94,7 @@ func executeRequest(sc session.MutableContext, req *http.Request, followRedirect
 	return httpClient.Do(req)
 }
 
+// TODO: this one not used as the jar already persists cookies on request
 func handleCookies(sc session.MutableContext, resp *http.Response, origin string, opt *RequestOptions) {
 	if opt != nil && !opt.Raw {
 		if err := persistSetCookies(sc, resp, origin); err != nil {

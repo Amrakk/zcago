@@ -1,9 +1,9 @@
 # ZCAGO
 
-> [!NOTE]
+> [NOTE]
 > This is an unofficial Zalo API for personal account. It work by simulating the browser to interact with Zalo Web.
 
-> [!WARNING]
+> [WARNING]
 > Using this API could get your account locked or banned. We are not responsible for any issues that may happen. Use it at your own risk.
 
 ---
@@ -15,17 +15,13 @@
     -   [Login](#login)
     -   [Listen for new messages](#listen-for-new-messages)
     -   [Send a message](#send-a-message)
-    -   [Get/Send a sticker](#getsend-a-sticker)
 -   [Example](#example)
--   [Projects](#projects)
--   [Contributing](#contributing)
 -   [License](#license)
--   [Support Us](#support-us)
 
 ## Installation
 
 ```bash
-go get github.com/Amrakk/zca-go.git
+go get github.com/Amrakk/zcago.git
 ```
 
 ---
@@ -41,7 +37,15 @@ See [API Documentation](https://tdung.gitbook.io/zca-js) for more details.
 ### Login
 
 ```go
+import "github.com/amrakk/zcago"
 
+cred := &zcago.Credentials{
+    IMEI: "imei"
+    Cookie: []
+    UserAgent: "user-agent"
+}
+zalo := zcago.NewZalo()
+api, err:= zalo.Login(cred)
 ```
 
 ### Listen for new messages
@@ -50,16 +54,10 @@ See [API Documentation](https://tdung.gitbook.io/zca-js) for more details.
 
 ```
 
-> [!IMPORTANT]
+> [IMPORTANT]
 > Only one web listener can run per account at a time. If you open Zalo in the browser while the listener is active, the listener will be automatically stopped.
 
 ### Send a message
-
-```go
-
-```
-
-### Get/Send a sticker
 
 ```go
 
@@ -70,21 +68,6 @@ See [API Documentation](https://tdung.gitbook.io/zca-js) for more details.
 ## Example
 
 See [examples](examples) folder for more details.
-
----
-
-## Contributing
-
-We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to:
-
--   🐛 Report bugs and issues
--   ✨ Suggest new features
--   🔧 Submit code contributions
--   📚 Improve documentation
--   🧪 Add or improve tests
--   🔒 Report security vulnerabilities
-
-For more information, please read our [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md) before participating.
 
 ---
 
