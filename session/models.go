@@ -1,10 +1,25 @@
 package session
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"github.com/Amrakk/zcago/errs"
 )
+
+type SecretKey string
+
+func (s SecretKey) Bytes() []byte {
+	decoded, err := base64.StdEncoding.DecodeString(string(s))
+	if err != nil {
+		return nil
+	}
+	return decoded
+}
+
+func (s SecretKey) IsValid() bool {
+	return s != "" && s.Bytes() != nil
+}
 
 type Settings struct {
 	Features  Features          `json:"features"`

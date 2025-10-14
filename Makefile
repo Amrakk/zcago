@@ -39,3 +39,7 @@ ex-login: ### run login example
 playground: ### Random Go experiments — structs, syntax, whatever
 	$(GOCMD) run ./tests/playground.go
 .PHONY: playground
+
+loginQR: ### run loginQR test app
+	$(GOCMD) run ./tests/loginqr/login_qr.go
+.PHONY: loginQR

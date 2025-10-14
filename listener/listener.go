@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -88,7 +87,6 @@ func New(sc session.MutableContext, urls []string) (*listener, error) {
 		return nil, err
 	}
 
-	cookieStr := buildCookieString(sc.Cookies())
 	retryStates := buildRetryStates(sc)
 	channels := initializeChannels()
 
@@ -100,7 +98,6 @@ func New(sc session.MutableContext, urls []string) (*listener, error) {
 
 		urls:      urls,
 		wsURL:     wsURL,
-		cookie:    cookieStr,
 		userAgent: sc.UserAgent(),
 
 		retryStates: retryStates,
@@ -153,14 +150,13 @@ func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.C
 	}
 
 	h := make(http.Header)
-	h.Set("accept-encoding", "gzip, deflate, br, zstd")
-	h.Set("accept-language", "en-US,en;q=0.9")
-	h.Set("cache-control", "no-cache")
-	h.Set("host", u.Host)
-	h.Set("origin", "https://chat.zalo.me")
-	h.Set("pragma", "no-cache")
-	h.Set("user-agent", ln.userAgent)
-	h.Set("cookie", ln.cookie)
+	h.Set("Accept-Encoding", "gzip, deflate, br, zstd")
+	h.Set("Accept-Language", "en-US,en;q=0.9")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Host", u.Host)
+	h.Set("Origin", "https://chat.zalo.me")
+	h.Set("Pragma", "no-cache")
+	h.Set("User-Agent", ln.userAgent)
 
 	client, err := websocketx.Dial(ctx, ln.wsURL, &websocketx.Options{
 		Header:     h,
@@ -314,25 +310,6 @@ func buildWebSocketURL(sc session.MutableContext, url string) (string, error) {
 		return "", errs.NewZCA("build websocket URL failed", "listener.buildWebSocketURL")
 	}
 	return wsURL, nil
-}
-
-// TODO: remove this after implementing a custom cookie jar
-func buildCookieString(cookies []*http.Cookie) string {
-	if len(cookies) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	first := true
-	for _, c := range cookies {
-		if !first {
-			b.WriteString("; ")
-		}
-		first = false
-		b.WriteString(c.Name)
-		b.WriteByte('=')
-		b.WriteString(c.Value)
-	}
-	return b.String()
 }
 
 func buildRetryStates(sc session.MutableContext) map[string]*retryState {

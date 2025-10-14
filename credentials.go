@@ -11,24 +11,25 @@ import (
 	"github.com/Amrakk/zcago/errs"
 )
 
+// Credentials represents authentication data needed for Zalo login.
 type Credentials struct {
-	IMEI      string      `json:"imei"`
-	Cookie    CookieUnion `json:"cookie"`
-	UserAgent string      `json:"userAgent"`
-	Language  *string     `json:"language,omitempty"`
+	IMEI      string       `json:"imei"`
+	Cookie    *CookieUnion `json:"cookie"`
+	UserAgent string       `json:"userAgent"`
+	Language  *string      `json:"language,omitempty"`
 }
 
 func NewCredentials(imei string, cookie CookieUnion, userAgent string, language *string) Credentials {
 	return Credentials{
 		IMEI:      imei,
-		Cookie:    cookie,
+		Cookie:    &cookie,
 		UserAgent: userAgent,
 		Language:  language,
 	}
 }
 
 func (c Credentials) IsValid() bool {
-	return len(c.IMEI) > 0 && c.Cookie.IsValid() && len(c.UserAgent) > 0
+	return len(c.IMEI) > 0 && (c.Cookie == nil || c.Cookie.IsValid()) && len(c.UserAgent) > 0
 }
 
 type SameSite string
@@ -145,6 +146,17 @@ type J2Cookie struct {
 	Cookies []Cookie `json:"cookies"`
 }
 
+// CookieUnion represents cookies in multiple formats.
+//
+// Supported formats:
+//
+// 1. Cookie Array
+//
+//	[{"name": "session", "value": "abc123", "domain": ".zalo.me"}]
+//
+// 2. J2Cookie Object
+//
+//	{"url": "https://chat.zalo.me", "cookies": [...]}
 type CookieUnion struct {
 	cookies  []Cookie
 	j2cookie *J2Cookie

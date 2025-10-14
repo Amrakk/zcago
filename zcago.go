@@ -36,12 +36,14 @@ func NewZalo(opts ...session.Option) Zalo {
 	return z
 }
 
+// Login authenticates using pre-saved credentials containing cookies from a previous session.
 func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
 	sc := session.NewContext(z.opts...)
 
 	return z.loginCookie(ctx, sc, cred)
 }
 
+// LoginQR performs interactive QR code authentication.
 func (z *zalo) LoginQR(ctx context.Context, opts *LoginQROption, cb LoginQRCallback) (API, error) {
 	const defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
 
@@ -75,7 +77,6 @@ func (z *zalo) LoginQR(ctx context.Context, opts *LoginQROption, cb LoginQRCallb
 	if cb != nil {
 		cb(auth.EventGotLoginInfo{
 			Data: auth.QRGotLoginInfoData{
-				Cookie:    res.Cookies,
 				IMEI:      imei,
 				UserAgent: options.UserAgent,
 			},
@@ -86,7 +87,7 @@ func (z *zalo) LoginQR(ctx context.Context, opts *LoginQROption, cb LoginQRCallb
 		IMEI:      imei,
 		UserAgent: options.UserAgent,
 		Language:  &options.Language,
-		Cookie:    NewHTTPCookie(res.Cookies),
+		// Cookie field omitted - preserves existing session cookies from QR login
 	}
 
 	return z.loginCookie(ctx, sc, cred)
@@ -105,9 +106,10 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	sc.SetLanguage(lang)
 	sc.SetUserAgent(cred.UserAgent)
 
-	u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
-
-	if len(sc.Cookies()) == 0 {
+	// Apply saved cookies if provided
+	// Skip if invalid/empty
+	if cred.Cookie != nil && cred.Cookie.IsValid() {
+		u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
 		jar := cred.Cookie.BuildCookieJar(&u)
 		sc.SetCookieJar(jar)
 	}

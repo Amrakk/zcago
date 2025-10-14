@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"net/http"
 )
 
 type LoginQREventType int
@@ -126,13 +125,12 @@ type QRScannedData struct {
 }
 
 type QRDeclinedData struct {
-	Code string `json:"code"`
+	Code string
 }
 
 type QRGotLoginInfoData struct {
-	Cookie    []*http.Cookie `json:"cookie"`
-	IMEI      string         `json:"imei"`
-	UserAgent string         `json:"userAgent"`
+	IMEI      string
+	UserAgent string
 }
 
 type UserInfo struct {
@@ -141,7 +139,7 @@ type UserInfo struct {
 }
 
 type QRUserInfo struct {
-	Logged           bool
-	SessionChatValid bool
-	Info             UserInfo
+	Logged           bool     `json:"logged"`
+	SessionChatValid bool     `json:"sessionChatValid"`
+	Info             UserInfo `json:"info"`
 }

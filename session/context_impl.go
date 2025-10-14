@@ -1,7 +1,6 @@
 package session
 
 import (
-	"encoding/base64"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -9,20 +8,6 @@ import (
 	"sync"
 	"time"
 )
-
-type SecretKey string
-
-func (s SecretKey) Bytes() []byte {
-	decoded, err := base64.StdEncoding.DecodeString(string(s))
-	if err != nil {
-		return nil
-	}
-	return decoded
-}
-
-func (s SecretKey) IsValid() bool {
-	return s != "" && s.Bytes() != nil
-}
 
 type contextImpl struct {
 	mu sync.RWMutex
@@ -41,7 +26,7 @@ type contextImpl struct {
 	loginInfo *LoginInfo
 	settings  *Settings
 	extraVer  *ExtraVer
-	cookie    http.CookieJar
+	jar       http.CookieJar
 
 	uploadCallbacks *CallbacksMap
 }
@@ -54,7 +39,13 @@ func newContextImpl(optFns ...Option) *contextImpl {
 		}
 	}
 
-	jar, _ := cookiejar.New(nil)
+	var jar http.CookieJar
+	if cfg.client != nil && cfg.client.Jar != nil {
+		jar = cfg.client.Jar
+	} else {
+		jar, _ = cookiejar.New(nil)
+	}
+	cfg.client.Jar = jar
 
 	return &contextImpl{
 		apiType:    cfg.apiType,
@@ -69,7 +60,7 @@ func newContextImpl(optFns ...Option) *contextImpl {
 			Client:              cfg.client,
 			ImageMetadataGetter: cfg.imageMetadataGetter,
 		},
-		cookie:          jar,
+		jar:             jar,
 		uploadCallbacks: NewCallbacksMap(),
 		language:        "vi",
 	}
@@ -89,15 +80,15 @@ type Seal struct {
 	LoginInfo *LoginInfo
 	Settings  *Settings
 	ExtraVer  *ExtraVer
-	Cookie    http.CookieJar
+	Jar       http.CookieJar
 }
 
 func (c *contextImpl) SealLogin(s Seal) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if s.Cookie != nil {
-		c.cookie = s.Cookie
+	if s.Jar != nil {
+		c.jar = s.Jar
 	}
 	c.uid = s.UID
 	c.imei = s.IMEI
@@ -130,20 +121,19 @@ func (c *contextImpl) SetIMEI(imei string)     { c.mu.Lock(); c.imei = imei; c.m
 func (c *contextImpl) SetUserAgent(ua string)  { c.mu.Lock(); c.userAgent = ua; c.mu.Unlock() }
 func (c *contextImpl) SetLanguage(lang string) { c.mu.Lock(); c.language = lang; c.mu.Unlock() }
 
-func (c *contextImpl) SetCookieJar(j http.CookieJar) { c.mu.Lock(); c.cookie = j; c.mu.Unlock() }
+func (c *contextImpl) SetCookieJar(j http.CookieJar) {
+	c.mu.Lock()
+	c.jar = j
+	if c.opts.Client != nil {
+		c.opts.Client.Jar = j
+	}
+	c.mu.Unlock()
+}
+
 func (c *contextImpl) CookieJar() http.CookieJar {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.cookie
-}
-
-func (c *contextImpl) AddCookies(u *url.URL, cookies []*http.Cookie) {
-	c.mu.RLock()
-	jar := c.cookie
-	c.mu.RUnlock()
-	if jar != nil && u != nil && len(cookies) > 0 {
-		jar.SetCookies(u, cookies)
-	}
+	return c.jar
 }
 
 func (c *contextImpl) AsReadOnly() Context { return c }
@@ -170,21 +160,6 @@ func (c *contextImpl) Settings() *Settings   { return c.settings }
 func (c *contextImpl) ExtraVer() *ExtraVer   { return c.extraVer }
 
 func (c *contextImpl) SecretKey() SecretKey { return c.secretKey }
-
-// BUG: get cookies for specific domains not working
-//
-// TODO: implement a custom cookie jar
-func (c *contextImpl) Cookies(domains ...string) []*http.Cookie {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.cookie == nil {
-		return nil
-	}
-
-	manager := NewCookieManager(c.cookie)
-	return manager.GetCookiesForDomains(domains...)
-}
 
 func (c *contextImpl) ZPWServiceMap() *ZpwServiceMap {
 	if c.loginInfo == nil {

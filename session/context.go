@@ -20,16 +20,7 @@ type Context interface {
 	LogLevel() uint8
 	CheckUpdate() bool
 
-	// Cookies returns a snapshot of cookies from the jar.
-	//
-	// Behavior:
-	//   - If no domains are specified, it returns cookies for the default domains:
-	//     "chat.zalo.me" and "zalo.me".
-	//   - If one or more domains are provided, it returns cookies only for those
-	//     domains.
-	//
-	// All returned cookies are copies; modifying them does not affect the jar.
-	Cookies(domains ...string) []*http.Cookie
+	CookieJar() http.CookieJar
 	SecretKey() SecretKey
 	LoginInfo() *LoginInfo
 	Settings() *Settings
@@ -54,9 +45,7 @@ type MutableContext interface {
 	SetUserAgent(ua string)
 	SetLanguage(lang string)
 
-	CookieJar() http.CookieJar
 	SetCookieJar(j http.CookieJar)
-	AddCookies(u *url.URL, cookies []*http.Cookie)
 
 	AsReadOnly() Context
 }

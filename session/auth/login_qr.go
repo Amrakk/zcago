@@ -24,7 +24,6 @@ var (
 
 type LoginQRResult struct {
 	UserInfo UserInfo
-	Cookies  []*http.Cookie
 }
 
 type LoginQRCallback func(event LoginQREvent) (any, error)
@@ -232,7 +231,6 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 
 	return &LoginQRResult{
 		UserInfo: userInfo.Data.Info,
-		Cookies:  sc.Cookies(),
 	}, stopTimeout, nil
 }
 

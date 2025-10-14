@@ -70,35 +70,15 @@ func getDefaultHeaders(sc session.MutableContext, origin string) (http.Header, e
 		return nil, fmt.Errorf("user agent is not available")
 	}
 
-	cookieStr := cookieString(sc.Cookies(origin))
-
 	h := make(http.Header, 8)
 	h.Set("Accept", "application/json, text/plain, */*")
 	h.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 	h.Set("Accept-Language", "en-US,en;q=0.9")
 	h.Set("Content-Type", "application/x-www-form-urlencoded")
-	h.Set("Cookie", cookieStr)
 	h.Set("Origin", "https://chat.zalo.me")
 	h.Set("Referer", "https://chat.zalo.me/")
 	h.Set("User-Agent", sc.UserAgent())
 	return h, nil
-}
-
-// TODO: remove this after implementing a custom cookie jar
-func cookieString(cookies []*http.Cookie) string {
-	if len(cookies) == 0 {
-		return ""
-	}
-	var b strings.Builder
-	for i, cookie := range cookies {
-		if i > 0 {
-			b.WriteString("; ")
-		}
-		b.WriteString(cookie.Name)
-		b.WriteByte('=')
-		b.WriteString(cookie.Value)
-	}
-	return b.String()
 }
 
 func mergeHeaders(dst, src http.Header) {

@@ -47,11 +47,6 @@ func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
 		api, err = a.zalo.Login(ctx, *cred)
 	} else {
 		api, err = a.zalo.LoginQR(ctx, nil, nil)
-		if err == nil {
-			if storeErr := a.storeCredentials(api); storeErr != nil {
-				fmt.Printf("Warning: failed to save credentials: %v\n", storeErr)
-			}
-		}
 	}
 
 	return api, err
@@ -88,29 +83,6 @@ func (a *App) loadCredentials() *zcago.Credentials {
 		return nil
 	}
 	return &c
-}
-
-func (a *App) storeCredentials(api zcago.API) error {
-	sc, err := api.GetContext()
-	if err != nil {
-		return fmt.Errorf("get context failed: %w", err)
-	}
-
-	lang := sc.Language()
-	cookies := zcago.NewHTTPCookie(sc.Cookies())
-	cred := zcago.NewCredentials(sc.IMEI(), cookies, sc.UserAgent(), &lang)
-
-	data, err := json.MarshalIndent(cred, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal credentials failed: %w", err)
-	}
-
-	if err := os.WriteFile(a.credPath, data, 0o600); err != nil {
-		return fmt.Errorf("write credentials failed: %w", err)
-	}
-
-	fmt.Println("Saved credentials to", a.credPath)
-	return nil
 }
 
 func rootDir() string {

@@ -39,8 +39,8 @@ func main() {
 			_ = e.Actions.Abort(ctx)
 
 		case auth.EventGotLoginInfo:
-			fmt.Printf("Login info: IMEI=%s, UA=%s, cookies=%d\n",
-				e.Data.IMEI, e.Data.UserAgent, len(e.Data.Cookie))
+			fmt.Printf("Login info: IMEI=%s, UA=%s\n",
+				e.Data.IMEI, e.Data.UserAgent)
 		}
 		return nil, nil
 	})

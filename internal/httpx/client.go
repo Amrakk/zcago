@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/Amrakk/zcago/internal/cryptox"
 	"github.com/Amrakk/zcago/internal/logger"
@@ -41,9 +39,6 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 	if err != nil {
 		return nil, err
 	}
-
-	// origin := getOrigin(urlStr)
-	// handleCookies(sc, resp, origin, opt)
 
 	if loc := resp.Header.Get("Location"); loc != "" {
 		logger.Log(sc).
@@ -80,56 +75,16 @@ func executeRequest(sc session.MutableContext, req *http.Request, followRedirect
 	client := sc.Client()
 	if client == nil {
 		client = http.DefaultClient
+		client.Jar = sc.CookieJar()
 	}
 
-	httpClient := *client
-	httpClient.Jar = sc.CookieJar()
-
 	if !followRedirects {
-		httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}
 	}
 
-	return httpClient.Do(req)
-}
-
-// TODO: this one not used as the jar already persists cookies on request
-func handleCookies(sc session.MutableContext, resp *http.Response, origin string, opt *RequestOptions) {
-	if opt != nil && !opt.Raw {
-		if err := persistSetCookies(sc, resp, origin); err != nil {
-			logger.Log(sc).Warn("Failed to persist cookies:", err)
-		}
-	}
-}
-
-func persistSetCookies(sc session.MutableContext, resp *http.Response, origin string) error {
-	jar := sc.CookieJar()
-	if jar == nil || resp == nil {
-		return nil
-	}
-
-	originURL, err := url.Parse(origin)
-	if err != nil {
-		return err
-	}
-
-	cookies := resp.Cookies()
-	if len(cookies) == 0 {
-		return nil
-	}
-
-	for _, cookie := range cookies {
-		target := originURL
-		if cookie.Domain != "" {
-			host := strings.TrimPrefix(cookie.Domain, ".")
-			if host != "" && !strings.EqualFold(host, "zalo.me") {
-				target = &url.URL{Scheme: "https", Host: host, Path: "/"}
-			}
-		}
-		jar.SetCookies(target, []*http.Cookie{cookie})
-	}
-	return nil
+	return client.Do(req)
 }
 
 func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncrypted bool) *ZaloResponse[T] {
