@@ -60,7 +60,6 @@ type listener struct {
 
 	urls      []string
 	wsURL     string
-	cookie    string
 	userAgent string
 
 	retryStates map[string]*retryState

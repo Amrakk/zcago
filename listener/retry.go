@@ -54,7 +54,7 @@ func (ln *listener) scheduleReconnection(ctx context.Context, ci websocketx.Clos
 func (ln *listener) canRetry(code int) (int, bool) {
 	ln.mu.Lock()
 	defer ln.mu.Unlock()
-	
+
 	if !ln.shouldRetry(code) {
 		return 0, false
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -26,91 +27,130 @@ type LoginQRResult struct {
 	UserInfo UserInfo
 }
 
-type LoginQRCallback func(event LoginQREvent) (any, error)
+type LoginQRCallback func(event LoginQREvent)
 
 const defaultQRPath = "qr.png"
 
 func LoginQR(ctx context.Context, sc session.MutableContext, qrPath string, cb LoginQRCallback) (*LoginQRResult, error) {
 	for {
-		attemptCtx, cancelAttempt := context.WithCancel(ctx)
-
-		retryCh := make(chan context.Context, 1)
-		abortCh := make(chan struct{}, 1)
-		resultCh := make(chan *LoginQRResult, 1)
-		errCh := make(chan error, 1)
-
-		ctrl := qrController{
-			retryFn: func(ctx context.Context) error {
-				select {
-				case retryCh <- ctx:
-				default:
-					{
-					}
-				}
-				return nil
-			},
-			abortFn: func(ctx context.Context) error {
-				select {
-				case abortCh <- struct{}{}:
-				default:
-					{
-					}
-				}
-				return nil
-			},
-		}
-
-		config := qrAttemptConfig{
-			qrPath:  qrPath,
-			cb:      cb,
-			ctrl:    ctrl,
-			retryCh: retryCh,
-		}
+		setup := setupQRAttempt(ctx, qrPath, cb)
 
 		stopTimeout := func() {}
 
 		go func() {
-			res, stopTimeoutFn, err := runQRAttempt(attemptCtx, sc, config)
+			res, stopTimeoutFn, err := runQRAttempt(setup.attemptCtx, sc, setup.config)
 			stopTimeout = stopTimeoutFn
 			if err != nil {
-				errCh <- err
+				setup.errCh <- err
 				return
 			}
-			resultCh <- res
+			setup.resultCh <- res
 		}()
 
-		select {
-		case <-ctx.Done():
-			stopTimeout()
-			cancelAttempt()
-			return nil, ctx.Err()
+		result := handleAttemptResult(ctx, sc, setup)
+		cleanupAttempt(stopTimeout, setup.cancelAttempt)
 
-		case newCtx := <-retryCh:
-			stopTimeout()
-			cancelAttempt()
-
-			ctx = newCtx
-			continue // next attempt loop
-
-		case <-abortCh:
-			stopTimeout()
-			cancelAttempt()
-			return nil, ErrLoginQRAborted
-
-		case err := <-errCh:
-			stopTimeout()
-			cancelAttempt()
-
-			if attemptCtx.Err() == nil {
-				logger.Log(sc).Error(err)
-			}
-			return nil, err
-
-		case res := <-resultCh:
-			stopTimeout()
-			cancelAttempt()
-			return res, nil
+		if result.shouldRetry {
+			ctx = result.newCtx
+			continue
 		}
+
+		if result.err != nil {
+			return nil, result.err
+		}
+
+		return result.result, nil
+	}
+}
+
+type qrAttemptSetup struct {
+	attemptCtx    context.Context
+	cancelAttempt context.CancelFunc
+	retryCh       chan context.Context
+	abortCh       chan struct{}
+	resultCh      chan *LoginQRResult
+	errCh         chan error
+	config        qrAttemptConfig
+}
+
+func setupQRAttempt(ctx context.Context, qrPath string, cb LoginQRCallback) *qrAttemptSetup {
+	attemptCtx, cancelAttempt := context.WithCancel(ctx)
+
+	retryCh := make(chan context.Context, 1)
+	abortCh := make(chan struct{}, 1)
+	resultCh := make(chan *LoginQRResult, 1)
+	errCh := make(chan error, 1)
+
+	ctrl := qrController{
+		retryFn: func(ctx context.Context) error {
+			select {
+			case retryCh <- ctx:
+			default:
+				{
+				}
+			}
+			return nil
+		},
+		abortFn: func(ctx context.Context) error {
+			select {
+			case abortCh <- struct{}{}:
+			default:
+				{
+				}
+			}
+			return nil
+		},
+	}
+
+	config := qrAttemptConfig{
+		qrPath:  qrPath,
+		cb:      cb,
+		ctrl:    ctrl,
+		retryCh: retryCh,
+	}
+
+	return &qrAttemptSetup{
+		attemptCtx:    attemptCtx,
+		cancelAttempt: cancelAttempt,
+		retryCh:       retryCh,
+		abortCh:       abortCh,
+		resultCh:      resultCh,
+		errCh:         errCh,
+		config:        config,
+	}
+}
+
+func cleanupAttempt(stopTimeout func(), cancelAttempt context.CancelFunc) {
+	stopTimeout()
+	cancelAttempt()
+}
+
+type attemptResult struct {
+	result      *LoginQRResult
+	err         error
+	newCtx      context.Context
+	shouldRetry bool
+}
+
+func handleAttemptResult(ctx context.Context, sc session.MutableContext, setup *qrAttemptSetup) attemptResult {
+	select {
+	case <-ctx.Done():
+		return attemptResult{err: ctx.Err()}
+
+	case newCtx := <-setup.retryCh:
+		return attemptResult{newCtx: newCtx, shouldRetry: true}
+
+	case <-setup.abortCh:
+		return attemptResult{err: ErrLoginQRAborted}
+
+	case err := <-setup.errCh:
+		if setup.attemptCtx.Err() == nil {
+			logger.Log(sc).Error(err)
+		}
+		return attemptResult{err: err}
+
+	case res := <-setup.resultCh:
+		return attemptResult{result: res}
 	}
 }
 
@@ -139,18 +179,63 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 	getLoginInfo(ctx, sc, ver)
 	verifyClient(ctx, sc, ver)
 
+	jar := sc.CookieJar()
+	fmt.Println(jar.Cookies(&url.URL{Host: "id.zalo.me", Scheme: "https"}))
+
+	qrData, imgBytes, err := generateAndProcessQR(ctx, sc, ver)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := handleQRCallback(cb, ctrl, qrData, imgBytes, qrPath, sc); err != nil {
+		return nil, nil, err
+	}
+
+	stopTimeout := setupQRTimeout(ctx, sc, cb, ctrl, retryCh)
+
+	scanResult, err := waitingScan(ctx, sc, ver, qrData.Code)
+	if err != nil {
+		return nil, stopTimeout, errs.NewZCA("Cannot get scan result", "auth.LoginQR")
+	}
+
+	if cb != nil {
+		cb(EventQRCodeScanned{
+			Data:    scanResult.Data,
+			Actions: actions,
+		})
+	}
+
+	if err := processConfirmation(ctx, sc, ver, qrData.Code, cb, actions); err != nil {
+		return nil, stopTimeout, err
+	}
+
+	userInfo, err := finalizeLogin(ctx, sc, scanResult.Data.DisplayName)
+	if err != nil {
+		return nil, stopTimeout, err
+	}
+
+	return &LoginQRResult{
+		UserInfo: userInfo.Data.Info,
+	}, stopTimeout, nil
+}
+
+func generateAndProcessQR(ctx context.Context, sc session.MutableContext, ver string) (QRGeneratedData, []byte, error) {
 	qrGenResult, err := generateQRCode(ctx, sc, ver)
 	if err != nil {
-		return nil, nil, errs.WrapZCA("Unable to generate QRCode", "auth.LoginQR", err)
+		return QRGeneratedData{}, nil, errs.WrapZCA("Unable to generate QRCode", "auth.LoginQR", err)
 	}
 
 	qrData := qrGenResult.Data
 	b64 := strings.TrimPrefix(qrData.Image, "data:image/png;base64,")
 	imgBytes, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
-		return nil, nil, err
+		return QRGeneratedData{}, nil, err
 	}
 
+	return qrData, imgBytes, nil
+}
+
+func handleQRCallback(cb LoginQRCallback, ctrl qrController, qrData QRGeneratedData, imgBytes []byte, qrPath string, sc session.MutableContext) error {
 	if cb != nil {
 		qrData.Image = string(imgBytes)
 		cb(EventQRCodeGenerated{
@@ -165,11 +250,14 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 		})
 	} else {
 		if err := saveQRCodeToFile(sc, qrPath, imgBytes); err != nil {
-			return nil, nil, err
+			return err
 		}
 	}
+	return nil
+}
 
-	stopTimeout := timex.SetTimeout(ctx, 100*time.Second, func() {
+func setupQRTimeout(ctx context.Context, sc session.MutableContext, cb LoginQRCallback, ctrl qrController, retryCh chan context.Context) func() {
+	return timex.SetTimeout(ctx, 100*time.Second, func() {
 		logger.Log(sc).Info("QR expired!")
 
 		if cb != nil {
@@ -183,55 +271,47 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 			}
 		}
 	})
+}
 
-	scanResult, err := waitingScan(ctx, sc, ver, qrData.Code)
+func processConfirmation(ctx context.Context, sc session.MutableContext, ver, code string, cb LoginQRCallback, actions commonActions) error {
+	confirmResult, err := waitingConfirm(ctx, sc, ver, code)
 	if err != nil {
-		return nil, stopTimeout, errs.NewZCA("Cannot get scan result", "auth.LoginQR")
-	}
-
-	if cb != nil {
-		cb(EventQRCodeScanned{
-			Data:    scanResult.Data,
-			Actions: actions,
-		})
-	}
-
-	confirmResult, err := waitingConfirm(ctx, sc, ver, qrData.Code)
-	if err != nil {
-		return nil, stopTimeout, errs.NewZCA("Cannot get confirm result", "auth.LoginQR")
+		return errs.NewZCA("Cannot get confirm result", "auth.LoginQR")
 	}
 
 	if confirmResult.ErrorCode == -13 {
 		if cb != nil {
 			cb(EventQRCodeDeclined{
-				Data:    QRDeclinedData{Code: qrData.Code},
+				Data:    QRDeclinedData{Code: code},
 				Actions: actions,
 			})
 		} else {
 			logger.Log(sc).Error("QRCode login declined")
-			return nil, stopTimeout, ErrLoginQRDeclined
+			return ErrLoginQRDeclined
 		}
 	} else if confirmResult.ErrorCode != 0 {
 		msg := fmt.Sprintf("An error has occurred\nResponse: Code: %d, Message: %s", confirmResult.ErrorCode, confirmResult.ErrorMessage)
-		return nil, stopTimeout, errs.NewZCA(msg, "auth.LoginQR")
+		return errs.NewZCA(msg, "auth.LoginQR")
 	}
 
+	return nil
+}
+
+func finalizeLogin(ctx context.Context, sc session.MutableContext, displayName string) (*httpx.Response[QRUserInfo], error) {
 	if err := checkSession(ctx, sc); err != nil {
-		return nil, stopTimeout, errs.NewZCA("Cannot get session, login failed", "auth.LoginQR")
+		return nil, errs.NewZCA("Cannot get session, login failed", "auth.LoginQR")
 	}
 
-	logger.Log(sc).Info("Successfully logged into the account ", scanResult.Data.DisplayName)
+	logger.Log(sc).Info("Successfully logged into the account ", displayName)
 
 	userInfo, err := getUserInfo(ctx, sc)
 	if err != nil {
-		return nil, stopTimeout, errs.NewZCA("Can't get account info", "auth.LoginQR")
+		return nil, errs.NewZCA("Can't get account info", "auth.LoginQR")
 	} else if !userInfo.Data.Logged {
-		return nil, stopTimeout, errs.NewZCA("Can't login", "auth.LoginQR")
+		return nil, errs.NewZCA("Can't login", "auth.LoginQR")
 	}
 
-	return &LoginQRResult{
-		UserInfo: userInfo.Data.Info,
-	}, stopTimeout, nil
+	return userInfo, nil
 }
 
 func loadLoginPage(ctx context.Context, sc session.MutableContext) (string, error) {
@@ -389,7 +469,7 @@ func saveQRCodeToFile(sc session.MutableContext, filepath string, imageData []by
 	if filepath == "" {
 		filepath = defaultQRPath
 	}
-	if err := os.WriteFile(filepath, imageData, 0o644); err != nil {
+	if err := os.WriteFile(filepath, imageData, 0o600); err != nil {
 		return err
 	}
 

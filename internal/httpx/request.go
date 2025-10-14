@@ -28,7 +28,6 @@ func BuildFormBody(data map[string]string) io.Reader {
 }
 
 func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Request, error) {
-	origin := getOrigin(urlStr)
 	headers := http.Header{}
 
 	method := "GET"
@@ -37,7 +36,7 @@ func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string,
 	}
 
 	if opt != nil && !opt.Raw {
-		def, err := getDefaultHeaders(sc, origin)
+		def, err := getDefaultHeaders(sc)
 		if err != nil {
 			return nil, err
 		}
@@ -62,10 +61,7 @@ func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string,
 	return req, nil
 }
 
-func getDefaultHeaders(sc session.MutableContext, origin string) (http.Header, error) {
-	if origin == "" {
-		origin = "https://chat.zalo.me"
-	}
+func getDefaultHeaders(sc session.MutableContext) (http.Header, error) {
 	if sc.UserAgent() == "" {
 		return nil, fmt.Errorf("user agent is not available")
 	}
@@ -90,12 +86,4 @@ func mergeHeaders(dst, src http.Header) {
 			dst.Set(k, v)
 		}
 	}
-}
-
-func getOrigin(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return ""
-	}
-	return (&url.URL{Scheme: u.Scheme, Host: u.Host}).String()
 }

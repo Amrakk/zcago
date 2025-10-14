@@ -11,10 +11,22 @@ linters-install: ### install golangci-lint if not present
 	}
 .PHONY: linters-install
 
-lint: ### run linters
-	make linters-install
-	golangci-lint run
+lint: ### run all linters and auto-fix issues
+	golangci-lint run --fix
 .PHONY: lint
+
+lint-staged: ### lint and fix only staged changes
+	@dirs=$$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$$' | xargs -r -n1 dirname | sort -u); \
+	if [ -z "$$dirs" ]; then echo "No staged Go files."; exit 0; fi; \
+	echo "Linting packages:" $$dirs; \
+	fail=0; \
+	for d in $$dirs; do \
+		echo "→ $$d"; \
+		golangci-lint run --fix "$$d" || fail=1; \
+	done; \
+	exit $$fail
+.PHONY: lint-staged
+
 
 format:
 	gofumpt -w .

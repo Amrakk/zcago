@@ -51,9 +51,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 		return errs.WrapZCA("failed to encode frame", "listener.SendWS", err)
 	}
 
-	client.Write(ctx, websocketx.BinaryMessage, frame)
-
-	return nil
+	return client.Write(ctx, websocketx.BinaryMessage, frame)
 }
 
 func (ln *listener) RequestOldMessages(ctx context.Context, tt model.ThreadType, lastMsgID *string) error {

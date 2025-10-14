@@ -17,7 +17,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	apiClient, err := z.LoginQR(ctx, &zcago.LoginQROption{}, func(ev auth.LoginQREvent) (any, error) {
+	apiClient, err := z.LoginQR(ctx, &zcago.LoginQROption{}, func(ev auth.LoginQREvent) {
 		switch e := ev.(type) {
 		case auth.EventQRCodeGenerated:
 			fmt.Println("Scan this QR Code to login:")
@@ -42,15 +42,16 @@ func main() {
 			fmt.Printf("Login info: IMEI=%s, UA=%s\n",
 				e.Data.IMEI, e.Data.UserAgent)
 		}
-		return nil, nil
 	})
 	if err != nil {
-		log.Fatalf("loginQR failed: %v", err)
+		log.Printf("loginQR failed: %v", err)
+		return
 	}
 
 	info, err := apiClient.FetchAccountInfo(ctx)
 	if err != nil {
-		log.Fatalf("FetchAccountInfo failed: %v", err)
+		log.Printf("FetchAccountInfo failed: %v", err)
+		return
 	}
 
 	raw, _ := json.MarshalIndent(info, "", "  ")

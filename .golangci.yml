@@ -22,13 +22,13 @@ linters:
     - unparam
     - whitespace
   settings:
+    cyclop:
+      max-complexity: 15
     errcheck:
       exclude-functions:
         - (io.Closer).Close
         - (net.Conn).Close
         - (*compress/gzip.Reader).Close
-
-        
   
 formatters:
   enable:
