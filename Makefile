@@ -27,7 +27,6 @@ lint-staged: ### lint and fix only staged changes
 	exit $$fail
 .PHONY: lint-staged
 
-
 format:
 	gofumpt -w .
 .PHONY: format
@@ -41,17 +40,23 @@ bench: ### run benchmarks
 .PHONY: bench
 
 gen-endpoint: ### generate endpoint skeleton (NAME=messages_send_image)
-	$(GOCMD) run ./cmd/zcago-gen-endpoint -name=$(NAME)
+	$(GOCMD) run ./cmd/gen-endpoint -name=$(NAME)
 .PHONY: gen-endpoint
 
 ex-login: ### run login example
-	$(GOCMD) run ./examples/login.go
+	$(GOCMD) run ./examples/login/login.go
 .PHONY: ex-login
 
+# Run tests
+	
 playground: ### Random Go experiments — structs, syntax, whatever
 	$(GOCMD) run ./tests/playground.go
 .PHONY: playground
 
 loginQR: ### run loginQR test app
-	$(GOCMD) run ./tests/loginqr/login_qr.go
+	$(GOCMD) run ./cmd/dev-login-qr/main.go
 .PHONY: loginQR
+
+api: ### run api test app
+	$(GOCMD) run ./cmd/dev-api-test/main.go
+.PHONY: api

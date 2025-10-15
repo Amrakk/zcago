@@ -132,13 +132,30 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 		payloadBytes = []byte(*base.Data)
 	}
 
-	var decoded Response[T]
-	if err := json.Unmarshal(payloadBytes, &decoded); err != nil {
+	var decodedMeta Response[json.RawMessage]
+	if err := json.Unmarshal(payloadBytes, &decodedMeta); err != nil {
 		logger.Log(sc).Error("Failed to unmarshal payload:", err)
 		out.Meta.Message = "Failed to parse response data"
 		return out
 	}
 
-	out.Data = decoded.Data
+	if decodedMeta.ErrorCode != 0 {
+		out.Meta.Code = decodedMeta.ErrorCode
+		out.Meta.Message = decodedMeta.ErrorMessage
+		return out
+	}
+
+	if len(decodedMeta.Data) == 0 || string(decodedMeta.Data) == "null" {
+		return out
+	}
+
+	var decoded T
+	if err := json.Unmarshal(decodedMeta.Data, &decoded); err != nil {
+		logger.Log(sc).Error("unmarshal data field:", err)
+		out.Meta.Message = "Failed to parse response data"
+		return out
+	}
+
+	out.Data = decoded
 	return out
 }

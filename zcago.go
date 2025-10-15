@@ -110,8 +110,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	// Skip if invalid/empty
 	if cred.Cookie != nil && cred.Cookie.IsValid() {
 		u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
-		jar := cred.Cookie.BuildCookieJar(&u)
-		sc.SetCookieJar(jar)
+		cred.Cookie.BuildCookieJar(&u, sc.CookieJar())
 	}
 
 	var (

@@ -209,7 +209,7 @@ func (cu *CookieUnion) GetHTTPCookies() []*http.Cookie {
 	return httpCookies
 }
 
-func (cu *CookieUnion) BuildCookieJar(u *url.URL) http.CookieJar {
+func (cu *CookieUnion) BuildCookieJar(u *url.URL, jar http.CookieJar) {
 	cookieArr := cu.GetCookies()
 
 	for i := range cookieArr {
@@ -218,7 +218,9 @@ func (cu *CookieUnion) BuildCookieJar(u *url.URL) http.CookieJar {
 		}
 	}
 
-	jar, _ := cookiejar.New(nil)
+	if jar == nil {
+		jar, _ = cookiejar.New(nil)
+	}
 	cookies := make([]*http.Cookie, len(cookieArr))
 
 	for i, c := range cookieArr {
@@ -226,7 +228,6 @@ func (cu *CookieUnion) BuildCookieJar(u *url.URL) http.CookieJar {
 	}
 
 	jar.SetCookies(u, cookies)
-	return jar
 }
 
 func (cu CookieUnion) MarshalJSON() ([]byte, error) {

@@ -137,7 +137,7 @@ func patchApiCore(cfg *Config) error {
 	}
 
 	fieldLine := fmt.Sprintf("%s %sFn", cfg.Name, cfg.Name)
-	bindLine := fmt.Sprintf("bind(a.ctx, a, &a.e.%s, %sFactory),", cfg.Name, cfg.FactoryName)
+	bindLine := fmt.Sprintf("bind(a.sc, a, &a.e.%s, %sFactory),", cfg.Name, cfg.FactoryName)
 
 	src, err = insertSortedInCurlyBlockAfterMarker(src, markerFields, fieldLine)
 	if err != nil {
