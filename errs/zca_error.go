@@ -1,6 +1,15 @@
 package errs
 
-import "fmt"
+import (
+	"fmt"
+)
+
+var (
+	ErrLoginQRAborted  = NewZCA("login QR aborted by user", "")
+	ErrLoginQRDeclined = NewZCA("login QR declined by user", "")
+
+	ErrMissingImageMetadataGetter = NewZCA("missing `imageMetadataGetter`. Please provide it in the Zalo object options.", "")
+)
 
 type ZCAError struct {
 	Message string
@@ -9,11 +18,7 @@ type ZCAError struct {
 	Meta    map[string]string
 }
 
-func (e *ZCAError) Error() string {
-	if e == nil {
-		return "<nil>"
-	}
-
+func (e ZCAError) Error() string {
 	base := "ZCAError"
 
 	switch {
@@ -28,10 +33,17 @@ func (e *ZCAError) Error() string {
 	}
 }
 
-func (e *ZCAError) Unwrap() error { return e.Cause }
+func (e ZCAError) Unwrap() error { return e.Cause }
 
-func NewZCA(msg, op string) *ZCAError { return &ZCAError{Message: msg, Op: op} }
+func (e ZCAError) Is(target error) bool {
+	if target, ok := target.(ZCAError); ok {
+		return e.Message == target.Message && e.Op == target.Op
+	}
+	return false
+}
 
-func WrapZCA(msg, op string, cause error) *ZCAError {
-	return &ZCAError{Message: msg, Op: op, Cause: cause}
+func NewZCA(msg, op string) ZCAError { return ZCAError{Message: msg, Op: op} }
+
+func WrapZCA(msg, op string, cause error) ZCAError {
+	return ZCAError{Message: msg, Op: op, Cause: cause}
 }

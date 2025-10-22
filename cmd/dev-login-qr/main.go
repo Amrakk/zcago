@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 
-	info, err := apiClient.FetchAccountInfo(ctx)
+	info, err := apiClient.GetAccountInfo(ctx)
 	if err != nil {
 		log.Printf("FetchAccountInfo failed: %v", err)
 		return

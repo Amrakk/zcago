@@ -29,7 +29,7 @@ func (a *api) UpdateLanguage(ctx context.Context, lang Language) (UpdateLanguage
 var updateLanguageFactory = apiFactory[UpdateLanguageResponse, UpdateLanguageFn]()(
 	func(a *api, sc session.Context, u factoryUtils[UpdateLanguageResponse]) (UpdateLanguageFn, error) {
 		base := jsonx.FirstOr(sc.GetZpwService("profile"), "")
-		url := u.MakeURL(base+"/api/social/profile/updatelang", nil, true)
+		serviceURL := u.MakeURL(base+"/api/social/profile/updatelang", nil, true)
 
 		return func(ctx context.Context, lang Language) (UpdateLanguageResponse, error) {
 			payload := map[string]any{
@@ -41,14 +41,14 @@ var updateLanguageFactory = apiFactory[UpdateLanguageResponse, UpdateLanguageFn]
 				return "", errs.WrapZCA("failed to encrypt params", "api.UpdateLanguage", err)
 			}
 
-			url := u.MakeURL(url, map[string]any{"params": enc}, true)
+			url := u.MakeURL(serviceURL, map[string]any{"params": enc}, true)
 			resp, err := u.Request(ctx, url, &httpx.RequestOptions{Method: http.MethodGet})
 			if err != nil {
 				return "", err
 			}
 			defer resp.Body.Close()
 
-			return u.Resolve(resp, nil, true)
+			return u.Resolve(resp, true)
 		}, nil
 	},
 )

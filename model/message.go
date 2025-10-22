@@ -2,7 +2,7 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
+	"strconv"
 
 	"github.com/Amrakk/zcago/errs"
 )
@@ -16,6 +16,7 @@ type UserMessage struct {
 
 func NewUserMessage(uid string, data TMessage) UserMessage {
 	msg := UserMessage{
+		Type:     ThreadTypeUser,
 		Data:     data,
 		ThreadID: data.UIDFrom,
 		IsSelf:   data.UIDFrom == "0",
@@ -29,10 +30,6 @@ func NewUserMessage(uid string, data TMessage) UserMessage {
 	}
 	if data.UIDFrom == "0" {
 		msg.Data.UIDFrom = uid
-	}
-
-	if msg.Data.Quote != nil {
-		msg.Data.Quote.OwnerID = fmt.Sprint(msg.Data.Quote.OwnerID)
 	}
 
 	return msg
@@ -56,16 +53,8 @@ func NewGroupMessage(uid string, data TGroupMessage) *GroupMessage {
 	if data.UIDFrom == "0" {
 		g.Data.UIDFrom = uid
 	}
-	if data.Quote != nil {
-		g.Data.Quote.OwnerID = fmt.Sprintf("%v", g.Data.Quote.OwnerID)
-	}
 
 	return g
-}
-
-type TGroupMessage struct {
-	TMessage
-	Mentions []*TMention `json:"mentions,omitempty"`
 }
 
 type TMessage struct {
@@ -95,6 +84,11 @@ type TMessage struct {
 	Quote             *TQuote      `json:"quote,omitempty"`
 }
 
+type TGroupMessage struct {
+	TMessage
+	Mentions []*TMention `json:"mentions,omitempty"`
+}
+
 type PropertyExt struct {
 	Color   int    `json:"color"`
 	Size    int    `json:"size"`
@@ -119,6 +113,23 @@ type TQuote struct {
 	Attach      string `json:"attach"`
 	FromD       string `json:"fromD"`
 	TTL         uint   `json:"ttl"`
+}
+
+func (tq *TQuote) UnmarshalJSON(data []byte) error {
+	type Alias TQuote
+	aux := &struct {
+		OwnerID int `json:"ownerId"`
+		*Alias
+	}{
+		Alias: (*Alias)(tq),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	tq.OwnerID = strconv.Itoa(aux.OwnerID)
+	return nil
 }
 
 type TAttachmentContent struct {

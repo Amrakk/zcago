@@ -53,7 +53,7 @@ func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
 }
 
 func (a *App) displayAccountInfo(ctx context.Context, api zcago.API) error {
-	info, err := api.FetchAccountInfo(ctx)
+	info, err := api.GetAccountInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch account info failed: %w", err)
 	}

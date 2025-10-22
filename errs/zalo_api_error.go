@@ -13,18 +13,28 @@ type ZaloAPIError struct {
 	Message string
 }
 
-func (e *ZaloAPIError) Error() string {
-	if e == nil {
-		return "<nil>"
-	}
+func (e ZaloAPIError) Error() string {
 	if e.Code != nil {
 		return fmt.Sprintf("ZaloAPIError[%d]: %s", *e.Code, e.Message)
 	}
 	return fmt.Sprintf("ZaloAPIError: %s", e.Message)
 }
 
-func NewZaloAPIError(msg string, code *ZaloErrorCode) *ZaloAPIError {
-	return &ZaloAPIError{
+func (e ZaloAPIError) Is(target error) bool {
+	if target, ok := target.(ZaloAPIError); ok {
+		if e.Code == nil && target.Code == nil {
+			return e.Message == target.Message
+		}
+		if e.Code != nil && target.Code != nil {
+			return *e.Code == *target.Code && e.Message == target.Message
+		}
+		return false
+	}
+	return false
+}
+
+func NewZaloAPIError(msg string, code *ZaloErrorCode) ZaloAPIError {
+	return ZaloAPIError{
 		Code:    code,
 		Message: msg,
 	}

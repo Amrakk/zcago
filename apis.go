@@ -5,6 +5,7 @@ import (
 
 	"github.com/Amrakk/zcago/api"
 	"github.com/Amrakk/zcago/listener"
+	"github.com/Amrakk/zcago/model"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -15,22 +16,28 @@ type API interface {
 
 	//gen:methods
 
+	// GetAccountInfo retrieves the account information.
+	//
+	// Params:
+	//   - ctx - cancel/deadline control
+	//
+	// Errors: errs.ZaloAPIError
+	GetAccountInfo(ctx context.Context) (*api.GetAccountInfoResponse, error)
 	// GetUserInfo returns the profile for userID.
 	//
 	// Params:
-	//   ctx    — cancel/deadline control
-	//   userID — target identifier
+	//   - ctx — cancel/deadline control
+	//   - userID — user id(s)
 	//
 	// Errors: errs.ZaloAPIError
-	FetchAccountInfo(ctx context.Context) (*api.FetchAccountInfoResponse, error)
 	GetUserInfo(ctx context.Context, userID ...string) (*api.GetUserInfoResponse, error)
-	// UpdateLanguage sets the user’s language.
-	//
-	// Note: Calling this endpoint alone will not update the user’s language.
+	// UpdateLanguage sets the user's language.
 	//
 	// Params:
-	//   - ctx  — cancel/deadline control
+	//   - ctx — cancel/deadline control
 	//   - lang — target language ("VI", "EN")
+	//
+	// Note: Calling this endpoint alone will not update the user's language.
 	//
 	// Errors: errs.ZaloAPIError
 	UpdateLanguage(ctx context.Context, lang api.Language) (api.UpdateLanguageResponse, error)

@@ -32,10 +32,25 @@ type User struct {
 	IsValid        int              `json:"isValid"`
 	UserKey        string           `json:"userKey"`
 	AccountStatus  int              `json:"accountStatus"`
-	OAInfo         interface{}      `json:"oaInfo"`
+	OAInfo         any              `json:"oaInfo"`
 	UserMode       int              `json:"user_mode"`
 	GlobalId       string           `json:"globalId"`
 	BizPkg         ZBusinessPackage `json:"bizPkg"`
 	CreatedTs      int64            `json:"createdTs"`
-	OAStatus       interface{}      `json:"oa_status"`
+	OAStatus       any              `json:"oa_status"`
+}
+type UserSetting struct {
+	AddFriendViaContact      int  `json:"add_friend_via_contact"`
+	DisplayOnRecommendFriend int  `json:"display_on_recommend_friend"`
+	AddFriendViaGroup        int  `json:"add_friend_via_group"`
+	AddFriendViaQR           int  `json:"add_friend_via_qr"`
+	QuickMessageStatus       int  `json:"quick_message_status"`
+	ShowOnlineStatus         bool `json:"show_online_status"`
+	AcceptStrangerCall       int  `json:"accept_stranger_call"`
+	ArchivedChatStatus       int  `json:"archived_chat_status"`
+	ReceiveMessage           int  `json:"receive_message"`
+	AddFriendViaPhone        int  `json:"add_friend_via_phone"`
+	DisplaySeenStatus        int  `json:"display_seen_status"`
+	ViewBirthday             int  `json:"view_birthday"`
+	Setting2FAStatus         int  `json:"setting_2FA_status"`
 }

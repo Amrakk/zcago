@@ -16,15 +16,9 @@ lint: ### run all linters and auto-fix issues
 .PHONY: lint
 
 lint-staged: ### lint and fix only staged changes
-	@dirs=$$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$$' | xargs -r -n1 dirname | sort -u); \
-	if [ -z "$$dirs" ]; then echo "No staged Go files."; exit 0; fi; \
-	echo "Linting packages:" $$dirs; \
-	fail=0; \
-	for d in $$dirs; do \
-		echo "→ $$d"; \
-		golangci-lint run --fix "$$d" || fail=1; \
-	done; \
-	exit $$fail
+	git diff --cached > /tmp/stage.patch
+	golangci-lint run --new-from-patch=/tmp/stage.patch
+	rm /tmp/stage.patch
 .PHONY: lint-staged
 
 format:

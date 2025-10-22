@@ -18,11 +18,6 @@ import (
 	"github.com/Amrakk/zcago/session"
 )
 
-var (
-	ErrLoginQRAborted  = &errs.ZCAError{Message: "login QR aborted by user", Op: "auth.LoginQR"}
-	ErrLoginQRDeclined = &errs.ZCAError{Message: "login QR declined by user", Op: "auth.LoginQR"}
-)
-
 type LoginQRResult struct {
 	UserInfo UserInfo
 }
@@ -141,7 +136,7 @@ func handleAttemptResult(ctx context.Context, sc session.MutableContext, setup *
 		return attemptResult{newCtx: newCtx, shouldRetry: true}
 
 	case <-setup.abortCh:
-		return attemptResult{err: ErrLoginQRAborted}
+		return attemptResult{err: errs.ErrLoginQRAborted}
 
 	case err := <-setup.errCh:
 		if setup.attemptCtx.Err() == nil {
@@ -287,7 +282,7 @@ func processConfirmation(ctx context.Context, sc session.MutableContext, ver, co
 			})
 		} else {
 			logger.Log(sc).Error("QRCode login declined")
-			return ErrLoginQRDeclined
+			return errs.ErrLoginQRDeclined
 		}
 	} else if confirmResult.ErrorCode != 0 {
 		msg := fmt.Sprintf("An error has occurred\nResponse: Code: %d, Message: %s", confirmResult.ErrorCode, confirmResult.ErrorMessage)

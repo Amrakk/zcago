@@ -1,11 +1,16 @@
 package httpx
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/Amrakk/zcago/session"
@@ -25,6 +30,58 @@ func BuildFormBody(data map[string]string) io.Reader {
 		form.Set(k, v)
 	}
 	return strings.NewReader(form.Encode())
+}
+
+type FormData struct {
+	Body   *bytes.Buffer
+	Header http.Header
+}
+
+func BuildFormData(fieldName, contentType, fileName string, source io.Reader) (*FormData, error) {
+	if fieldName == "" {
+		return nil, fmt.Errorf("fieldName is required")
+	}
+	if fileName == "" {
+		fileName = "blob"
+	}
+
+	if contentType == "" {
+		if ext := filepath.Ext(fileName); ext != "" {
+			contentType = mime.TypeByExtension(ext)
+		}
+		if contentType == "" {
+			head := make([]byte, 512)
+			n, _ := io.ReadFull(source, head)
+			contentType = http.DetectContentType(head[:n])
+			source = io.MultiReader(bytes.NewReader(head[:n]), source)
+		}
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+	}
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	fieldHeader := make(textproto.MIMEHeader)
+	fieldHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileName))
+	fieldHeader.Set("Content-Type", contentType)
+
+	part, err := writer.CreatePart(fieldHeader)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = io.Copy(part, source); err != nil {
+		return nil, err
+	}
+	if err = writer.Close(); err != nil {
+		return nil, err
+	}
+
+	h := make(http.Header, 1)
+	h.Set("Content-Type", writer.FormDataContentType())
+
+	return &FormData{Body: body, Header: h}, nil
 }
 
 func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Request, error) {

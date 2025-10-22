@@ -117,7 +117,7 @@ var %sFactory = apiFactory[%sResponse, %sFn]()(
 			}
 			defer resp.Body.Close()
 
-			return u.Resolve(resp, nil, true)
+			return u.Resolve(resp, true)
 		}, nil
 	},
 )

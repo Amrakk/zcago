@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/Amrakk/zcago/model"
 )
 
 type Context interface {
@@ -19,6 +21,7 @@ type Context interface {
 	IsLogging() bool
 	LogLevel() uint8
 	CheckUpdate() bool
+	GetImageMetadata(path string) (model.AttachmentMetadata, string, error)
 
 	CookieJar() http.CookieJar
 	SecretKey() SecretKey

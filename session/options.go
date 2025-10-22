@@ -2,6 +2,8 @@ package session
 
 import (
 	"net/http"
+
+	"github.com/Amrakk/zcago/model"
 )
 
 type Option func(*options)
@@ -68,10 +70,4 @@ func defaultOptions() options {
 	}
 }
 
-type ImageMetadataGetterResponse struct {
-	Width  uint `json:"width"`
-	Height uint `json:"height"`
-	Size   uint `json:"size"`
-}
-
-type ImageMetadataGetter func(filePath string) (*ImageMetadataGetterResponse, error)
+type ImageMetadataGetter func(filePath string) (model.AttachmentMetadata, error)

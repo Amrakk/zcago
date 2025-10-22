@@ -4,9 +4,13 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
+
+	"github.com/Amrakk/zcago/errs"
+	"github.com/Amrakk/zcago/model"
 )
 
 type contextImpl struct {
@@ -154,6 +158,20 @@ func (c *contextImpl) Options() OptionsSnapshot { return c.opts }
 func (c *contextImpl) IsLogging() bool          { return c.opts.Logging }
 func (c *contextImpl) LogLevel() uint8          { return c.opts.LogLevel }
 func (c *contextImpl) CheckUpdate() bool        { return c.opts.CheckUpdate }
+func (c *contextImpl) GetImageMetadata(path string) (model.AttachmentMetadata, string, error) {
+	getter := c.opts.ImageMetadataGetter
+	if getter == nil {
+		return model.AttachmentMetadata{}, "", errs.ErrMissingImageMetadataGetter
+	}
+
+	meta, err := getter(path)
+	if err != nil {
+		return model.AttachmentMetadata{}, "", errs.WrapZCA("failed to get image metadata", "context.GetImageMetadata", err)
+	}
+
+	fileName := filepath.Base(path)
+	return meta, fileName, nil
+}
 
 func (c *contextImpl) LoginInfo() *LoginInfo { return c.loginInfo }
 func (c *contextImpl) Settings() *Settings   { return c.settings }

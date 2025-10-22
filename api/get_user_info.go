@@ -12,15 +12,14 @@ import (
 	"github.com/Amrakk/zcago/session"
 )
 
-type ProfileInfo = model.User
-
-type GetUserInfoResponse struct {
-	UnchangedProfiles map[string]any         `json:"unchanged_profiles"`
-	PhonebookVersion  uint                   `json:"phonebook_version"`
-	ChangedProfiles   map[string]ProfileInfo `json:"changed_profiles"`
-}
-
-type GetUserInfoFn = func(ctx context.Context, userId ...string) (*GetUserInfoResponse, error)
+type (
+	GetUserInfoResponse struct {
+		UnchangedProfiles map[string]any        `json:"unchanged_profiles"`
+		PhonebookVersion  uint                  `json:"phonebook_version"`
+		ChangedProfiles   map[string]model.User `json:"changed_profiles"`
+	}
+	GetUserInfoFn = func(ctx context.Context, userId ...string) (*GetUserInfoResponse, error)
+)
 
 func (a *api) GetUserInfo(ctx context.Context, userID ...string) (*GetUserInfoResponse, error) {
 	return a.e.GetUserInfo(ctx, userID...)
@@ -53,13 +52,16 @@ var getUserInfoFactory = apiFactory[*GetUserInfoResponse, GetUserInfoFn]()(
 			}
 
 			body := httpx.BuildFormBody(map[string]string{"params": enc})
-			resp, err := u.Request(ctx, serviceURL, &httpx.RequestOptions{Method: http.MethodPost, Body: body})
+			resp, err := u.Request(ctx, serviceURL, &httpx.RequestOptions{
+				Method: http.MethodPost,
+				Body:   body,
+			})
 			if err != nil {
 				return nil, err
 			}
 			defer resp.Body.Close()
 
-			return u.Resolve(resp, nil, true)
+			return u.Resolve(resp, true)
 		}, nil
 	},
 )

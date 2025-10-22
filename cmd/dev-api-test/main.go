@@ -4,11 +4,48 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"image"
+	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/Amrakk/zcago"
+	API "github.com/Amrakk/zcago/api"
+	"github.com/Amrakk/zcago/model"
 )
+
+func metadataGetter(path string) (model.AttachmentMetadata, error) {
+	// #nosec G304 -- path is controlled by internal test context
+	file, err := os.Open(path)
+	if err != nil {
+		return model.AttachmentMetadata{}, err
+	}
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			log.Printf("failed to close file %q: %v", path, cerr)
+		}
+	}()
+
+	info, err := file.Stat()
+	if err != nil {
+		return model.AttachmentMetadata{}, err
+	}
+
+	// Decode image configuration to get width and height
+	cfg, _, err := image.DecodeConfig(file)
+	if err != nil {
+		// Non-image files: return size only
+		return model.AttachmentMetadata{
+			Size: info.Size(),
+		}, nil
+	}
+
+	return model.AttachmentMetadata{
+		Size:   info.Size(),
+		Width:  cfg.Width,
+		Height: cfg.Height,
+	}, nil
+}
 
 type App struct {
 	zalo     zcago.Zalo
@@ -17,7 +54,7 @@ type App struct {
 
 func main() {
 	app := &App{
-		zalo:     zcago.NewZalo(),
+		zalo:     zcago.NewZalo(zcago.WithImageMetadataGetter(metadataGetter)),
 		credPath: filepath.Join(rootDir(), "cmd", "credentials.json"),
 	}
 
@@ -47,7 +84,7 @@ func (a *App) authenticate(ctx context.Context) (zcago.API, error) {
 // ---- Edit only this function to try a different API call ----
 func (a *App) runAPITest(ctx context.Context, api zcago.API) error {
 	// Example: swap this line to any `api.<Method>(ctx, ...)`
-	res, err := api.FetchAccountInfo(ctx)
+	res, err := api.GetAccountInfo(ctx)
 	if err != nil {
 		return err
 	}

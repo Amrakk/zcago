@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Amrakk/zcago/session"
@@ -57,7 +59,7 @@ func (u *URLBuilder) Build() string {
 func MakeURL(
 	sc session.Context,
 	baseURL string,
-	params map[string]interface{},
+	params map[string]any,
 	includeDefaults bool,
 ) string {
 	u, err := url.Parse(baseURL)
@@ -68,16 +70,16 @@ func MakeURL(
 	query := u.Query()
 	for key, value := range params {
 		if !query.Has(key) {
-			query.Set(key, fmt.Sprintf("%v", value))
+			query.Set(key, convertToString(value))
 		}
 	}
 
 	if includeDefaults {
 		if !query.Has("zpw_ver") {
-			query.Set("zpw_ver", fmt.Sprintf("%v", sc.APIVersion()))
+			query.Set("zpw_ver", convertToString(sc.APIVersion()))
 		}
 		if !query.Has("zpw_type") {
-			query.Set("zpw_type", fmt.Sprintf("%v", sc.APIType()))
+			query.Set("zpw_type", convertToString(sc.APIType()))
 		}
 	}
 
@@ -85,19 +87,19 @@ func MakeURL(
 	return u.String()
 }
 
-func SignZaloURL(baseURL string, apiType string, params map[string]interface{}) string {
+func SignZaloURL(baseURL string, apiType string, params map[string]any) string {
 	signKey := GenerateZaloSignKey(apiType, params)
 
 	urlBuilder := NewURL(baseURL)
 	for k, v := range params {
-		urlBuilder.Param(k, fmt.Sprintf("%v", v))
+		urlBuilder.Param(k, convertToString(v))
 	}
 	urlBuilder.Param("signkey", signKey)
 
 	return urlBuilder.Build()
 }
 
-func GenerateZaloSignKey(apiType string, params map[string]interface{}) string {
+func GenerateZaloSignKey(apiType string, params map[string]any) string {
 	keys := make([]string, 0, len(params))
 	for k := range params {
 		keys = append(keys, k)
@@ -116,25 +118,28 @@ func GenerateZaloSignKey(apiType string, params map[string]interface{}) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func convertToString(v interface{}) string {
+func convertToString(v any) string {
 	switch val := v.(type) {
 	case string:
 		return val
 	case []byte:
 		return string(val)
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", val)
+	case int:
+		return strconv.Itoa(val)
+	case int8, int16, int32, int64:
+		return strconv.FormatInt(reflect.ValueOf(val).Int(), 10)
 	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", val)
-	case float32, float64:
-		return fmt.Sprintf("%v", val)
+		return strconv.FormatUint(reflect.ValueOf(val).Uint(), 10)
+
+	case float32:
+		return strconv.FormatFloat(float64(val), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(val, 'f', -1, 64)
 	case bool:
-		if val {
-			return "true"
-		}
-		return "false"
+		return strconv.FormatBool(val)
+
 	default:
-		return fmt.Sprintf("%v", val)
+		return fmt.Sprint(val)
 	}
 }
 

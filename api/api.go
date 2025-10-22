@@ -37,9 +37,9 @@ type api struct {
 type endpoints struct {
 	//gen:fields
 
-	FetchAccountInfo FetchAccountInfoFn
-	GetUserInfo      GetUserInfoFn
-	UpdateLanguage   UpdateLanguageFn
+	GetAccountInfo        GetAccountInfoFn
+	GetUserInfo           GetUserInfoFn
+	UpdateLanguage        UpdateLanguageFn
 }
 
 func (a *api) initEndpoints() error {
@@ -50,18 +50,18 @@ func (a *api) initEndpoints() error {
 	return firstErr(
 		//gen:binds
 
-		bind(a.sc, a, &a.e.FetchAccountInfo, fetchAccountInfoFactory),
+		bind(a.sc, a, &a.e.GetAccountInfo, getAccountInfoFactory),
 		bind(a.sc, a, &a.e.GetUserInfo, getUserInfoFactory),
 		bind(a.sc, a, &a.e.UpdateLanguage, updateLanguageFactory),
 	)
 }
 
 type factoryUtils[T any] struct {
-	MakeURL   func(baseURL string, params map[string]interface{}, includeDefaults bool) string
+	MakeURL   func(baseURL string, params map[string]any, includeDefaults bool) string
 	EncodeAES func(data string) (string, error)
 	Request   func(ctx context.Context, url string, options *httpx.RequestOptions) (*http.Response, error)
 	Logger    *logger.Logger
-	Resolve   func(res *http.Response, cb func(result *httpx.ZaloResponse[T]) T, isEncrypted bool) (T, error)
+	Resolve   func(res *http.Response, isEncrypted bool) (T, error)
 }
 
 type (
@@ -86,8 +86,8 @@ func apiFactory[T any, R any]() func(
 					return httpx.Request(ctx, sc, url, opts)
 				},
 				Logger: logger.Log(sc),
-				Resolve: func(res *http.Response, cb func(*httpx.ZaloResponse[T]) T, isEncrypted bool) (T, error) {
-					return resolveResponse(sc, res, cb, isEncrypted)
+				Resolve: func(res *http.Response, isEncrypted bool) (T, error) {
+					return resolveResponse[T](sc, res, isEncrypted)
 				},
 			}
 
@@ -99,7 +99,6 @@ func apiFactory[T any, R any]() func(
 func resolveResponse[T any](
 	sc session.Context,
 	res *http.Response,
-	cb func(*httpx.ZaloResponse[T]) T,
 	isEncrypted bool,
 ) (T, error) {
 	var zero T
@@ -113,9 +112,7 @@ func resolveResponse[T any](
 		code := errs.ZaloErrorCode(r.Meta.Code)
 		return zero, errs.NewZaloAPIError(r.Meta.Message, &code)
 	}
-	if cb != nil {
-		return cb(r), nil
-	}
+
 	return r.Data, nil
 }
 

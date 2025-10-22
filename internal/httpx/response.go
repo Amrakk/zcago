@@ -28,7 +28,7 @@ func DecodeResponse(resp *http.Response) (io.ReadCloser, error) {
 	}
 }
 
-func ReadJSON(resp *http.Response, target interface{}) error {
+func ReadJSON(resp *http.Response, target any) error {
 	body, err := DecodeResponse(resp)
 	if err != nil {
 		return err
