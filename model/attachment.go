@@ -1,9 +1,13 @@
 package model
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"io"
+	"os"
 	"strings"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 )
 
@@ -33,18 +37,91 @@ func NewObjectAttachment(filename string, meta AttachmentMetadata, data io.Reade
 	return &AttachmentSource{obj: o}, nil
 }
 
-func (a AttachmentSource) IsString() bool { return a.str != nil }
-func (a AttachmentSource) IsObject() bool { return a.obj != nil }
-func (a AttachmentSource) String() string {
-	if a.str == nil {
+func (s AttachmentSource) IsString() bool { return s.str != nil }
+func (s AttachmentSource) IsObject() bool { return s.obj != nil }
+func (s AttachmentSource) String() string {
+	if s.str == nil {
 		return ""
 	}
-	return *a.str
+	return *s.str
 }
 
-func (a AttachmentSource) Object() *AttachmentObject {
-	if a.obj == nil {
+func (s AttachmentSource) Object() *AttachmentObject {
+	if s.obj == nil {
 		return nil
 	}
-	return a.obj
+	return s.obj
+}
+
+type UploadAttachment struct {
+	FileID  string `json:"fileId"`
+	FileURL string `json:"fileUrl"`
+}
+
+func NewUploadAttachment(fileID, fileURL string) UploadAttachment {
+	return UploadAttachment{FileID: fileID, FileURL: fileURL}
+}
+
+type FileType string
+
+const (
+	FileTypeImage FileType = "image"
+	FileTypeVideo FileType = "video"
+	FileTypeGif   FileType = "gif"
+	FileTypeOther FileType = "others"
+)
+
+type MD5ChecksumResult struct {
+	CurrentChunk int
+	Checksum     string
+}
+
+func (s *AttachmentSource) GetLargeFileMD5() *MD5ChecksumResult {
+	var (
+		reader io.Reader
+		closer io.Closer
+	)
+
+	defer func() {
+		if closer != nil {
+			_ = closer.Close()
+		}
+	}()
+
+	if f := s.String(); f != "" {
+		r, err := os.Open(f)
+		if err != nil {
+			return nil
+		}
+
+		reader = r
+		closer = r
+	} else if f := s.Object(); f != nil {
+		reader = f.Data
+	}
+
+	h := md5.New()
+	buf := make([]byte, config.AttachmentChunksSize)
+	chunks := 0
+
+	for {
+		n, err := io.ReadFull(reader, buf)
+		switch err {
+		case nil:
+			_, _ = h.Write(buf[:n])
+			chunks++
+		case io.ErrUnexpectedEOF:
+			if n > 0 {
+				_, _ = h.Write(buf[:n])
+				chunks++
+			}
+			sum := hex.EncodeToString(h.Sum(nil))
+			return &MD5ChecksumResult{CurrentChunk: chunks, Checksum: sum}
+		case io.EOF:
+			sum := hex.EncodeToString(h.Sum(nil))
+			return &MD5ChecksumResult{CurrentChunk: chunks, Checksum: sum}
+		default:
+			return nil
+		}
+	}
 }

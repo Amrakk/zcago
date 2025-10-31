@@ -3,6 +3,7 @@ package listener
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/Amrakk/zcago/errs"
@@ -20,6 +21,9 @@ func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body Bas
 
 	case "1_501_0":
 		ln.handleMessages(ctx, body)
+
+	case "1_601_0":
+		ln.handleControls(ctx, body)
 
 	case "1_3000_0":
 		ln.handleDuplicateConnection()
@@ -83,6 +87,38 @@ func (ln *listener) handleMessages(ctx context.Context, body BaseWSMessage) {
 				continue
 			}
 			emit(ctx, ln.ch.Message, messageObject)
+		}
+	}
+}
+
+func (ln *listener) handleControls(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.ControlEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleControls", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	for _, ctrl := range eventData.Data.Controls {
+		content := ctrl.Content
+		switch content.ActionType {
+		case "file_done":
+			if content.FileID == nil || content.Data.UploadAttachment == nil {
+				continue
+			}
+
+			fileID, url := *content.FileID, content.Data.UploadAttachment.URL
+			uploadObject := model.NewUploadAttachment(strconv.FormatInt(fileID, 10), url)
+
+			uploadCallback, ok := ln.sc.UploadCallback().Get(strconv.FormatInt(fileID, 10))
+			if ok {
+				go uploadCallback(uploadObject)
+				ln.sc.UploadCallback().Delete(strconv.FormatInt(fileID, 10))
+			}
+
+			emit(ctx, ln.ch.UploadAttachment, uploadObject)
+		case "group":
+		case "fr":
 		}
 	}
 }

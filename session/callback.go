@@ -3,16 +3,13 @@ package session
 import (
 	"sync"
 	"time"
+
+	"github.com/Amrakk/zcago/model"
 )
 
 const defaultTTL = 5 * time.Minute
 
-type UploadEventData struct {
-	FileURL string `json:"fileUrl"`
-	FileID  string `json:"fileId"`
-}
-
-type UploadCallback = func(data UploadEventData) any
+type UploadCallback = func(data model.UploadAttachment)
 
 type CallbacksMap struct {
 	mu     sync.Mutex

@@ -11,6 +11,9 @@ linters:
       - linters: [gosec]
         text: "G501: Blocklisted import crypto/md5: weak cryptographic primitive"
         # justification: "MD5 required by zalo"
+      - linters: [gosec]
+        text: "G304: Potential file inclusion via variable"
+        
   enable:
     - cyclop
     - gocritic

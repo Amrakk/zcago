@@ -37,8 +37,8 @@ type Listener interface {
 	// DeliveredMessage() <-chan []DeliveredMessage
 	// Reaction() <-chan Reaction
 	// OldReaction() <-chan OldReactions
-	// UploadAttachment() <-chan UploadAttachment
 	Undo() <-chan model.Undo
+	UploadAttachment() <-chan model.UploadAttachment
 	// Friend() <-chan Friend
 	// Group() <-chan Group
 	CipherKey() <-chan string
@@ -348,8 +348,8 @@ func initializeChannels() channels {
 		// DeliveredMessages: make(chan []DeliveredMessage, buf.DeliveredMessages),
 		// Reaction: make(chan Reaction, buf.Reaction),
 		// OldReactions: make(chan OldReactionsEvent, buf.OldReactions),
-		// UploadAttachment: make(chan UploadEventData, buf.UploadAttachment),
-		Undo: make(chan model.Undo, buf.Undo),
+		Undo:             make(chan model.Undo, buf.Undo),
+		UploadAttachment: make(chan model.UploadAttachment, buf.UploadAttachment),
 		// Friend: make(chan FriendEvent, buf.Friend),
 		// Group: make(chan GroupEvent, buf.Group),
 		CipherKey: make(chan string, buf.CipherKey),

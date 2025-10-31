@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"image"
+	_ "image/gif"  // Register GIF format
+	_ "image/jpeg" // Register JPEG format
+	_ "image/png"  // Register PNG format
 	"log"
 	"os"
 	"path/filepath"
@@ -15,35 +19,32 @@ import (
 )
 
 func metadataGetter(path string) (model.AttachmentMetadata, error) {
-	// #nosec G304 -- path is controlled by internal test context
-	file, err := os.Open(path)
+	// #nosec G304 — path is controlled by internal test context
+	f, err := os.Open(path)
 	if err != nil {
 		return model.AttachmentMetadata{}, err
 	}
 	defer func() {
-		if cerr := file.Close(); cerr != nil {
+		if cerr := f.Close(); cerr != nil {
 			log.Printf("failed to close file %q: %v", path, cerr)
 		}
 	}()
 
-	info, err := file.Stat()
+	info, err := f.Stat()
 	if err != nil {
 		return model.AttachmentMetadata{}, err
 	}
 
-	// Decode image configuration to get width and height
-	cfg, _, err := image.DecodeConfig(file)
+	reader := bufio.NewReader(f)
+	config, _, err := image.DecodeConfig(reader)
 	if err != nil {
-		// Non-image files: return size only
-		return model.AttachmentMetadata{
-			Size: info.Size(),
-		}, nil
+		return model.AttachmentMetadata{}, err
 	}
 
 	return model.AttachmentMetadata{
 		Size:   info.Size(),
-		Width:  cfg.Width,
-		Height: cfg.Height,
+		Width:  config.Width,
+		Height: config.Height,
 	}, nil
 }
 

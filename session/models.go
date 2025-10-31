@@ -33,18 +33,18 @@ type Features struct {
 
 type ShareFileSettings struct {
 	BigFileDomainList     []string `json:"big_file_domain_list"`
-	MaxSizeShareFileV2    uint     `json:"max_size_share_file_v2"`
-	MaxSizeShareFileV3    uint     `json:"max_size_share_file_v3"`
+	MaxSizeShareFileV2    int64    `json:"max_size_share_file_v2"`
+	MaxSizeShareFileV3    int64    `json:"max_size_share_file_v3"`
 	FileUploadShowIcon1GB bool     `json:"file_upload_show_icon_1GB"`
 	RestrictedExt         string   `json:"restricted_ext"`
-	NextFileTime          uint     `json:"next_file_time"`
-	MaxFile               uint     `json:"max_file"`
-	MaxSizePhoto          uint     `json:"max_size_photo"`
-	MaxSizeShareFile      uint     `json:"max_size_share_file"`
-	MaxSizeResizePhoto    uint     `json:"max_size_resize_photo"`
-	MaxSizeGif            uint     `json:"max_size_gif"`
-	MaxSizeOriginalPhoto  uint     `json:"max_size_original_photo"`
-	ChunkSizeFile         uint     `json:"chunk_size_file"`
+	NextFileTime          int      `json:"next_file_time"`
+	MaxFile               int      `json:"max_file"`
+	MaxSizePhoto          int      `json:"max_size_photo"`
+	MaxSizeShareFile      int      `json:"max_size_share_file"`
+	MaxSizeResizePhoto    int      `json:"max_size_resize_photo"`
+	MaxSizeGif            int      `json:"max_size_gif"`
+	MaxSizeOriginalPhoto  int      `json:"max_size_original_photo"`
+	ChunkSizeFile         int64    `json:"chunk_size_file"`
 	RestrictedExtFile     []string `json:"restricted_ext_file"`
 }
 

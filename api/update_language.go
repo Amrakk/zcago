@@ -33,7 +33,7 @@ var updateLanguageFactory = apiFactory[UpdateLanguageResponse, UpdateLanguageFn]
 
 		return func(ctx context.Context, lang Language) (UpdateLanguageResponse, error) {
 			payload := map[string]any{
-				"language": string(lang),
+				"language": lang,
 			}
 
 			enc, err := u.EncodeAES(jsonx.Stringify(payload))

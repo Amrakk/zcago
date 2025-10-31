@@ -7,6 +7,14 @@ import (
 	"github.com/Amrakk/zcago/errs"
 )
 
+type Urgency int
+
+const (
+	UrgDefault Urgency = iota
+	UrgImportant
+	UrgUrgent
+)
+
 type UserMessage struct {
 	Type     ThreadType
 	Data     TMessage
@@ -77,7 +85,7 @@ type TMessage struct {
 	TopOutImprTimeOut string       `json:"topOutImprTimeOut"`
 	PropertyExt       *PropertyExt `json:"propertyExt,omitempty"`
 	ParamsExt         ParamsExt    `json:"paramsExt"`
-	Cmd               int          `json:"cmd"`
+	CMD               int          `json:"cmd"`
 	ST                int          `json:"st"`
 	AT                int          `json:"at"`
 	RealMsgID         string       `json:"realMsgId"`
@@ -116,12 +124,12 @@ type TQuote struct {
 }
 
 func (tq *TQuote) UnmarshalJSON(data []byte) error {
-	type Alias TQuote
+	type alias TQuote
 	aux := &struct {
 		OwnerID int `json:"ownerId"`
-		*Alias
+		*alias
 	}{
-		Alias: (*Alias)(tq),
+		alias: (*alias)(tq),
 	}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -145,11 +153,28 @@ type TAttachmentContent struct {
 
 type TOtherContent map[string]any
 
+type MentionType int
+
+const (
+	MentionEach MentionType = iota
+	MentionAll
+)
+
 type TMention struct {
-	UID  string `json:"uid"`
-	Pos  int    `json:"pos"`
-	Len  int    `json:"len"`
-	Type int    `json:"type"` // 0 | 1, so keep int
+	UID  string      `json:"uid"` // User ID being mentioned, or "-1" for mention all
+	Pos  int         `json:"pos"` // Mention position
+	Len  int         `json:"len"` // Mention length
+	Type MentionType `json:"type"`
+}
+
+func (m *TMention) IsValid() bool {
+	if m.Type == 1 && m.UID == "-1" {
+		return true
+	}
+	if m.Type == 0 && m.UID != "" && m.UID != "-1" && m.Len > 0 {
+		return true
+	}
+	return false
 }
 
 type Content struct {
@@ -191,4 +216,16 @@ func (c Content) MarshalJSON() ([]byte, error) {
 		return json.Marshal(c.Other)
 	}
 	return []byte("null"), nil
+}
+
+type OutboundMessage struct {
+	MsgID    string
+	CliMsgID string
+	UIDFrom  string
+	IDTo     string
+	MsgType  string
+	ST       int
+	AT       int
+	CMD      int
+	TS       int64
 }

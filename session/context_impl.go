@@ -176,8 +176,13 @@ func (c *contextImpl) GetImageMetadata(path string) (model.AttachmentMetadata, s
 func (c *contextImpl) LoginInfo() *LoginInfo { return c.loginInfo }
 func (c *contextImpl) Settings() *Settings   { return c.settings }
 func (c *contextImpl) ExtraVer() *ExtraVer   { return c.extraVer }
+func (c *contextImpl) SecretKey() SecretKey  { return c.secretKey }
 
-func (c *contextImpl) SecretKey() SecretKey { return c.secretKey }
+func (c *contextImpl) UploadCallback() *CallbacksMap {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.uploadCallbacks
+}
 
 func (c *contextImpl) ZPWServiceMap() *ZpwServiceMap {
 	if c.loginInfo == nil {

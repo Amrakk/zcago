@@ -17,7 +17,7 @@ func (e ZaloAPIError) Error() string {
 	if e.Code != nil {
 		return fmt.Sprintf("ZaloAPIError[%d]: %s", *e.Code, e.Message)
 	}
-	return fmt.Sprintf("ZaloAPIError: %s", e.Message)
+	return "ZaloAPIError: " + e.Message
 }
 
 func (e ZaloAPIError) Is(target error) bool {

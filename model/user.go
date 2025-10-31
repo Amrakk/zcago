@@ -54,3 +54,13 @@ type UserSetting struct {
 	ViewBirthday             int  `json:"view_birthday"`
 	Setting2FAStatus         int  `json:"setting_2FA_status"`
 }
+
+type UserSummary struct {
+	ID            string `json:"id"`
+	DName         string `json:"dName"`
+	ZaloName      string `json:"zaloName"`
+	Avatar        string `json:"avatar"`
+	Avatar25      string `json:"avatar_25"`
+	AccountStatus int    `json:"accountStatus"`
+	Type          int    `json:"type"`
+}

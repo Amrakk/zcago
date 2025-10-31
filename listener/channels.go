@@ -19,15 +19,15 @@ type Buffers struct {
 	// DeliveredMessage int
 	// Reaction         int
 	// OldReaction      int
-	// UploadAttachment int
-	Undo int
+	Undo             int
+	UploadAttachment int
 	// Friend           int
 	// Group            int
 	CipherKey int
 }
 
 func defaultBuffers() Buffers {
-	return Buffers{Connected: 1, Disconnected: 4, Closed: 1, Error: 16, Message: 128, Undo: 32, CipherKey: 4}
+	return Buffers{Connected: 1, Disconnected: 4, Closed: 1, Error: 16, Message: 64, Undo: 32, CipherKey: 4, UploadAttachment: 32}
 }
 
 type channels struct {
@@ -42,8 +42,8 @@ type channels struct {
 	// DeliveredMessage chan []DeliveredMessage
 	// Reaction         chan Reaction
 	// OldReaction      chan OldReactions
-	// UploadAttachment chan UploadAttachment
-	Undo chan model.Undo
+	Undo             chan model.Undo
+	UploadAttachment chan model.UploadAttachment
 	// Friend           chan Friend
 	// Group            chan Group
 	CipherKey chan string
@@ -62,8 +62,8 @@ func (ln *listener) Message() <-chan model.UserMessage { return ln.ch.Message }
 // func (ln *listener) DeliveredMessage() <-chan []DeliveredMessage { return ln.ch.DeliveredMessage }
 // func (ln *listener) Reaction() <-chan Reaction                   { return ln.ch.Reaction }
 // func (ln *listener) OldReaction() <-chan OldReactions            { return ln.ch.OldReaction }
-// func (ln *listener) UploadData() <-chan UploadData               { return ln.ch.UploadData }
-func (ln *listener) Undo() <-chan model.Undo { return ln.ch.Undo }
+func (ln *listener) Undo() <-chan model.Undo                         { return ln.ch.Undo }
+func (ln *listener) UploadAttachment() <-chan model.UploadAttachment { return ln.ch.UploadAttachment }
 
 // func (ln *listener) Friend() <-chan Friend                       { return ln.ch.Friend }
 // func (ln *listener) Group() <-chan Group                         { return ln.ch.Group }

@@ -2,6 +2,8 @@ package errs
 
 import (
 	"fmt"
+
+	"github.com/Amrakk/zcago/config"
 )
 
 var (
@@ -9,6 +11,15 @@ var (
 	ErrLoginQRDeclined = NewZCA("login QR declined by user", "")
 
 	ErrMissingImageMetadataGetter = NewZCA("missing `imageMetadataGetter`. Please provide it in the Zalo object options.", "")
+
+	ErrFileContentUnavailable     = NewZCA("unable to get file content", "")
+	ErrInvalidMessageCount        = NewZCA(fmt.Sprintf("message count out of range (allowed: 1-%d)", config.MaxMessagesPerRequest), "")
+	ErrInconsistentGroupRecipient = NewZCA("all messages in a group thread must share the same idTo", "")
+
+	ErrSourceEmpty       = NewZCA("source cannot be empty", "")
+	ErrExceedMaxFile     = NewZCA("exceeded maximum number of files per request", "")
+	ErrInvalidExtension  = NewZCA("file has an invalid extension", "")
+	ErrExceedMaxFileSize = NewZCA("exceeded maximum file size", "")
 )
 
 type ZCAError struct {

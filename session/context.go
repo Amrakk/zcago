@@ -28,6 +28,7 @@ type Context interface {
 	LoginInfo() *LoginInfo
 	Settings() *Settings
 	ExtraVer() *ExtraVer
+	UploadCallback() *CallbacksMap
 
 	ZPWWebsocket() []string
 	WSPingInterval() time.Duration

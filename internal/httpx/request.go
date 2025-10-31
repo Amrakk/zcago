@@ -37,51 +37,100 @@ type FormData struct {
 	Header http.Header
 }
 
-func BuildFormData(fieldName, contentType, fileName string, source io.Reader) (*FormData, error) {
-	if fieldName == "" {
-		return nil, fmt.Errorf("fieldName is required")
-	}
-	if fileName == "" {
-		fileName = "blob"
-	}
+type BuildOptions struct {
+	FileName    string // default: "blob"
+	ContentType string // default: auto-detect then fallback to octet-stream
+	ChunkSize   int64  // >0 => build chunks; else single form
+}
 
-	if contentType == "" {
-		if ext := filepath.Ext(fileName); ext != "" {
-			contentType = mime.TypeByExtension(ext)
-		}
-		if contentType == "" {
-			head := make([]byte, 512)
-			n, _ := io.ReadFull(source, head)
-			contentType = http.DetectContentType(head[:n])
-			source = io.MultiReader(bytes.NewReader(head[:n]), source)
-		}
-		if contentType == "" {
-			contentType = "application/octet-stream"
-		}
+type Opt func(*BuildOptions)
+
+func WithFileName(name string) Opt  { return func(o *BuildOptions) { o.FileName = name } }
+func WithContentType(ct string) Opt { return func(o *BuildOptions) { o.ContentType = ct } }
+func WithChunkSize(n int64) Opt     { return func(o *BuildOptions) { o.ChunkSize = n } }
+
+func BuildFormData(fieldName string, source io.Reader, opts ...Opt) ([]*FormData, error) {
+	o := BuildOptions{FileName: "blob"}
+	for _, f := range opts {
+		f(&o)
 	}
 
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	fieldHeader := make(textproto.MIMEHeader)
-	fieldHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileName))
-	fieldHeader.Set("Content-Type", contentType)
-
-	part, err := writer.CreatePart(fieldHeader)
+	ct, src := detectContentType(o.FileName, o.ContentType, source)
+	if o.ChunkSize > 0 {
+		return buildChunks(fieldName, ct, o.FileName, src, o.ChunkSize)
+	}
+	fd, err := buildOne(fieldName, ct, o.FileName, src)
 	if err != nil {
 		return nil, err
 	}
-	if _, err = io.Copy(part, source); err != nil {
+	return []*FormData{fd}, nil
+}
+
+func detectContentType(fileName, explicitCT string, src io.Reader) (string, io.Reader) {
+	if explicitCT != "" {
+		return explicitCT, src
+	}
+	if ext := filepath.Ext(fileName); ext != "" {
+		if ct := mime.TypeByExtension(ext); ct != "" {
+			return ct, src
+		}
+	}
+	head := make([]byte, 512)
+	n, _ := io.ReadFull(src, head)
+	ct := http.DetectContentType(head[:n])
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	return ct, io.MultiReader(bytes.NewReader(head[:n]), src)
+}
+
+func buildOne(fieldName, contentType, fileName string, src io.Reader) (*FormData, error) {
+	body := &bytes.Buffer{}
+	w := multipart.NewWriter(body)
+
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, fieldName, fileName))
+	h.Set("Content-Type", contentType)
+
+	part, err := w.CreatePart(h)
+	if err != nil {
 		return nil, err
 	}
-	if err = writer.Close(); err != nil {
+	if _, err = io.Copy(part, src); err != nil {
+		return nil, err
+	}
+	if err = w.Close(); err != nil {
 		return nil, err
 	}
 
-	h := make(http.Header, 1)
-	h.Set("Content-Type", writer.FormDataContentType())
+	hdr := make(http.Header, 1)
+	hdr.Set("Content-Type", w.FormDataContentType())
+	return &FormData{Body: body, Header: hdr}, nil
+}
 
-	return &FormData{Body: body, Header: h}, nil
+func buildChunks(fieldName, contentType, fileName string, src io.Reader, chunkSize int64) ([]*FormData, error) {
+	if chunkSize <= 0 {
+		return nil, fmt.Errorf("chunkSize must be > 0")
+	}
+	var out []*FormData
+	r := src
+	for {
+		lr := &io.LimitedReader{R: r, N: chunkSize}
+		fd, err := buildOne(fieldName, contentType, fileName, lr)
+		if err != nil {
+			return nil, err
+		}
+
+		consumed := chunkSize - lr.N
+		if consumed == 0 {
+			break
+		}
+		out = append(out, fd)
+		if consumed < chunkSize {
+			break
+		}
+	}
+	return out, nil
 }
 
 func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Request, error) {

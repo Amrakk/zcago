@@ -27,7 +27,8 @@ func (m *messageOrUndo) UnmarshalJSON(data []byte) error {
 		m.Message = &tm
 		return nil
 	}
-	return errs.NewZCA("data did not match TMessage or TUndo", "messageOrUndo.UnmarshalJSON")
+
+	return nil
 }
 
 func (m messageOrUndo) MarshalJSON() ([]byte, error) {
