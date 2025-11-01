@@ -1,8 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image/gif"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -42,6 +45,7 @@ type (
 
 	GIFContent struct {
 		Attachment model.AttachmentSource
+		Thumb      *model.AttachmentSource
 		TTL        int // Time to live in milliseconds
 	}
 
@@ -64,7 +68,7 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 			model.ThreadTypeGroup: u.MakeURL(base+"/api/group/gif", nil, true),
 		}
 
-		return func(ctx context.Context, threadID string, threadType model.ThreadType, gif GIFContent) (*SendGIFResponse, error) {
+		return func(ctx context.Context, threadID string, threadType model.ThreadType, content GIFContent) (*SendGIFResponse, error) {
 			var (
 				reader       io.Reader
 				closer       io.Closer
@@ -72,13 +76,7 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				fileMetadata model.AttachmentMetadata
 			)
 
-			defer func() {
-				if closer != nil {
-					_ = closer.Close()
-				}
-			}()
-
-			if f := gif.Attachment.String(); f != "" {
+			if f := content.Attachment.String(); f != "" {
 				r, err := os.Open(f)
 				if err != nil {
 					return nil, errs.WrapZCA("failed to read file", "api.SendGIF", err)
@@ -91,12 +89,51 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				if err != nil {
 					return nil, err
 				}
-			} else if f := gif.Attachment.Object(); f != nil {
+			} else if f := content.Attachment.Object(); f != nil {
 				reader, fileName, fileMetadata = f.Data, f.Filename, f.Metadata
 			}
 
+			data, err := io.ReadAll(reader)
+			if err != nil {
+				return nil, errs.WrapZCA("failed to read attachment data", "api.SendGIF", err)
+			}
+			if closer != nil {
+				_ = closer.Close()
+			}
+
+			if content.Thumb == nil {
+				g, err := gif.DecodeAll(bytes.NewReader(data))
+				if err != nil {
+					return nil, errs.WrapZCA("failed to decode gif for thumbnail", "api.SendGIF", err)
+				}
+
+				first := g.Image[0]
+				b := first.Bounds()
+
+				var buf bytes.Buffer
+				if err := png.Encode(&buf, first); err != nil {
+					return nil, errs.WrapZCA("failed to encode png thumbnail", "api.SendGIF", err)
+				}
+				meta := model.AttachmentMetadata{
+					Size:   int64(buf.Len()),
+					Width:  b.Dx(),
+					Height: b.Dy(),
+				}
+
+				thumbSource, err := model.NewObjectAttachment(
+					fileName,
+					meta,
+					bytes.NewReader(buf.Bytes()),
+				)
+				if err != nil {
+					return nil, err
+				}
+
+				content.Thumb = thumbSource
+			}
+
 			forms, err := httpx.BuildFormData(
-				"chunkContent", reader,
+				"chunkContent", bytes.NewReader(data),
 				httpx.WithContentType("application/octet-stream"),
 				httpx.WithFileName(fileName),
 				httpx.WithChunkSize(config.GIFChunkSize),
@@ -105,7 +142,7 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				return nil, errs.WrapZCA("failed to build form data", "api.SendGIF", err)
 			}
 
-			thumb, err := a.UploadThumbnail(ctx, gif.Attachment)
+			thumb, err := a.UploadThumbnail(ctx, *content.Thumb)
 			if err != nil {
 				return nil, errs.WrapZCA("failed to upload thumbnail", "api.SendGIF", err)
 			}
@@ -118,9 +155,9 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				Height:     fileMetadata.Height,
 				Msg:        "",
 				Type:       1,
-				TTL:        gif.TTL,
+				TTL:        content.TTL,
 				Thumb:      thumb.URL,
-				Checksum:   gif.Attachment.GetLargeFileMD5().Checksum,
+				Checksum:   content.Attachment.GetLargeFileMD5().Checksum,
 				TotalChunk: len(forms),
 				ChunkID:    1,
 			}

@@ -7,10 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -166,7 +164,7 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 					reader, fileName, fileMetadata = f.Data, f.Filename, f.Metadata
 				}
 
-				ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(fileName), "."))
+				ext := source.GetExtension()
 				if !isValidExtension(ext) {
 					cleanup()
 					return nil, errs.ErrInvalidExtension

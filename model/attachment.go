@@ -5,10 +5,20 @@ import (
 	"encoding/hex"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
+)
+
+type FileType string
+
+const (
+	FileTypeImage FileType = "image"
+	FileTypeVideo FileType = "video"
+	FileTypeGif   FileType = "gif"
+	FileTypeOther FileType = "others"
 )
 
 type AttachmentSource struct {
@@ -53,23 +63,25 @@ func (s AttachmentSource) Object() *AttachmentObject {
 	return s.obj
 }
 
-type UploadAttachment struct {
-	FileID  string `json:"fileId"`
-	FileURL string `json:"fileUrl"`
+func (s AttachmentSource) GetExtension() string {
+	var name string
+	switch {
+	case s.IsString():
+		name = s.String()
+	case s.IsObject():
+		name = s.Object().Filename
+	default:
+		return ""
+	}
+	if name == "" {
+		return ""
+	}
+	ext := filepath.Ext(name)
+	if len(ext) > 0 && ext[0] == '.' {
+		ext = ext[1:]
+	}
+	return strings.ToLower(ext)
 }
-
-func NewUploadAttachment(fileID, fileURL string) UploadAttachment {
-	return UploadAttachment{FileID: fileID, FileURL: fileURL}
-}
-
-type FileType string
-
-const (
-	FileTypeImage FileType = "image"
-	FileTypeVideo FileType = "video"
-	FileTypeGif   FileType = "gif"
-	FileTypeOther FileType = "others"
-)
 
 type MD5ChecksumResult struct {
 	CurrentChunk int
@@ -124,4 +136,13 @@ func (s *AttachmentSource) GetLargeFileMD5() *MD5ChecksumResult {
 			return nil
 		}
 	}
+}
+
+type UploadAttachment struct {
+	FileID  string `json:"fileId"`
+	FileURL string `json:"fileUrl"`
+}
+
+func NewUploadAttachment(fileID, fileURL string) UploadAttachment {
+	return UploadAttachment{FileID: fileID, FileURL: fileURL}
 }
