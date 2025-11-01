@@ -1,5 +1,7 @@
 package model
 
+import "encoding/json"
+
 type UserTyping struct {
 	Type     ThreadType
 	Data     TTyping
@@ -35,7 +37,24 @@ func NewGroupTyping(data TGroupTyping) GroupTyping {
 type TTyping struct {
 	UID  string `json:"uid"`
 	TS   string `json:"ts"`
-	IsPC int    `json:"isPC"` // 0 | 1
+	IsPC bool   `json:"isPC"`
+}
+
+func (t *TTyping) UnmarshalJSON(data []byte) error {
+	type Alias TTyping
+	aux := &struct {
+		IsPC int `json:"isPC"`
+		*Alias
+	}{
+		Alias: (*Alias)(t),
+	}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	t.IsPC = aux.IsPC != 0
+	return nil
 }
 
 type TGroupTyping struct {

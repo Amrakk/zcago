@@ -11,26 +11,16 @@ import (
 	"github.com/Amrakk/zcago/model"
 )
 
+// ----------------------------------------
+// WebSocket sending utilities
+// ----------------------------------------
+
 type WSPayload struct {
 	Version uint8
 	CMD     uint16
 	SubCMD  uint8
 	Data    map[string]any
 }
-
-type WSMessage[T any] struct {
-	Key          *string `json:"key"`
-	Encrypt      uint    `json:"encrypt"`
-	ErrorCode    int     `json:"error_code"`
-	ErrorMessage string  `json:"error_message"`
-	Data         T       `json:"data"`
-}
-
-type BaseWSMessage = WSMessage[string]
-
-// ----------------------------------------
-// WebSocket sending utilities
-// ----------------------------------------
 
 func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) error {
 	if err := ln.validateSendRequest(ctx); err != nil {
@@ -120,6 +110,16 @@ func (ln *listener) addRequestID(p *WSPayload) {
 // ----------------------------------------
 // Websocket reading utilities
 // ----------------------------------------
+
+type WSMessage[T any] struct {
+	Key          *string `json:"key"`
+	Encrypt      uint    `json:"encrypt"`
+	ErrorCode    int     `json:"error_code"`
+	ErrorMessage string  `json:"error_message"`
+	Data         T       `json:"data"`
+}
+
+type BaseWSMessage = WSMessage[string]
 
 func (ln *listener) handleWebSocketMessage(ctx context.Context, msg websocketx.Message) {
 	if msg.Type != websocketx.BinaryMessage {

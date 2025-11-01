@@ -3,6 +3,7 @@ package session
 import (
 	"net/http"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/model"
 )
 
@@ -64,8 +65,8 @@ func defaultOptions() options {
 		checkUpdate: true,
 		logging:     true,
 		logLevel:    1, // Debug level by default
-		apiType:     30,
-		apiVersion:  665,
+		apiType:     config.DefaultAPIType,
+		apiVersion:  config.DefaultAPIVersion,
 		client:      http.DefaultClient,
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/session"
 )
 
@@ -177,8 +178,8 @@ func getDefaultHeaders(sc session.MutableContext) (http.Header, error) {
 	h.Set("Accept-Encoding", "gzip, deflate, br, zstd")
 	h.Set("Accept-Language", "en-US,en;q=0.9")
 	h.Set("Content-Type", "application/x-www-form-urlencoded")
-	h.Set("Origin", "https://chat.zalo.me")
-	h.Set("Referer", "https://chat.zalo.me/")
+	h.Set("Origin", config.DefaultURL.String())
+	h.Set("Referer", config.DefaultURL.String()+"/")
 	h.Set("User-Agent", sc.UserAgent())
 	return h, nil
 }

@@ -7,8 +7,6 @@
 
 ## Low Priority
 
--   **Config cleanup** - Migrate some of the magic number to config
-
 ## Maybe
 
 ## Unimplemented API list:

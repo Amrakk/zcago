@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/logger"
@@ -22,8 +23,6 @@ type LoginQRResult struct {
 }
 
 type LoginQRCallback func(event LoginQREvent)
-
-const defaultQRPath = "qr.png"
 
 func LoginQR(ctx context.Context, sc session.MutableContext, qrPath string, cb LoginQRCallback) (*LoginQRResult, error) {
 	for {
@@ -321,11 +320,7 @@ func loadLoginPage(ctx context.Context, sc session.MutableContext) (string, erro
 	h.Set("Upgrade-Insecure-Requests", "1")
 	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-	opts := httpx.RequestOptions{
-		Headers: h,
-		Method:  "GET",
-	}
-
+	opts := httpx.RequestOptions{Method: http.MethodGet, Headers: h}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account?continue=https%3A%2F%2Fchat.zalo.me%2F", &opts)
 	if err != nil {
 		return "", err
@@ -367,11 +362,7 @@ func getLoginInfo(ctx context.Context, sc session.MutableContext, ver string) {
 		"continue": "https://zalo.me/pc",
 	})
 
-	opts := &httpx.RequestOptions{
-		Method:  "POST",
-		Body:    body,
-		Headers: h,
-	}
+	opts := &httpx.RequestOptions{Method: http.MethodPost, Headers: h, Body: body}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/logininfo", opts)
 	if err != nil {
 		logger.Log(sc).Error(err)
@@ -402,11 +393,7 @@ func verifyClient(ctx context.Context, sc session.MutableContext, ver string) {
 		"continue": "https://zalo.me/pc",
 	})
 
-	opts := &httpx.RequestOptions{
-		Method:  "POST",
-		Body:    body,
-		Headers: h,
-	}
+	opts := &httpx.RequestOptions{Method: http.MethodPost, Headers: h, Body: body}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/verify-client", opts)
 	if err != nil {
 		logger.Log(sc).Error(err)
@@ -436,11 +423,7 @@ func generateQRCode(ctx context.Context, sc session.MutableContext, ver string) 
 		"continue": "https://zalo.me/pc",
 	})
 
-	opts := &httpx.RequestOptions{
-		Method:  "POST",
-		Body:    form,
-		Headers: h,
-	}
+	opts := &httpx.RequestOptions{Method: http.MethodPost, Headers: h, Body: form}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/authen/qr/generate", opts)
 	if err != nil {
 		logger.Log(sc).Error(err)
@@ -458,7 +441,7 @@ func generateQRCode(ctx context.Context, sc session.MutableContext, ver string) 
 
 func saveQRCodeToFile(sc session.MutableContext, filepath string, imageData []byte) error {
 	if filepath == "" {
-		filepath = defaultQRPath
+		filepath = config.DefaultQRPath
 	}
 	if err := os.WriteFile(filepath, imageData, 0o600); err != nil {
 		return err
@@ -494,12 +477,7 @@ func waitingScan(
 		"continue": "https://zalo.me/pc",
 	})
 
-	opts := &httpx.RequestOptions{
-		Method:  "POST",
-		Body:    form,
-		Headers: h,
-	}
-
+	opts := &httpx.RequestOptions{Method: http.MethodPost, Headers: h, Body: form}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/authen/qr/waiting-scan", opts)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -551,12 +529,7 @@ func waitingConfirm(
 		"continue": "https://zalo.me/pc",
 	})
 
-	opts := &httpx.RequestOptions{
-		Method:  "POST",
-		Body:    form,
-		Headers: h,
-	}
-
+	opts := &httpx.RequestOptions{Method: http.MethodPost, Headers: h, Body: form}
 	resp, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/authen/qr/waiting-confirm", opts)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -593,11 +566,7 @@ func checkSession(ctx context.Context, sc session.MutableContext) error {
 	h.Set("Referer", "https://id.zalo.me/account?continue=https%3A%2F%2Fchat.zalo.me%2F")
 	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-	opts := httpx.RequestOptions{
-		Headers: h,
-		Method:  "GET",
-	}
-
+	opts := httpx.RequestOptions{Headers: h, Method: http.MethodGet}
 	_, err := httpx.Request(ctx, sc, "https://id.zalo.me/account/checksession?continue=https%3A%2F%2Fchat.zalo.me%2Findex.html", &opts)
 	if err != nil {
 		logger.Log(sc).Error(err)
@@ -619,19 +588,14 @@ func getUserInfo(ctx context.Context, sc session.MutableContext) (*httpx.Respons
 	h.Set("Sec-Fetch-Dest", "empty")
 	h.Set("Sec-Fetch-Mode", "cors")
 	h.Set("Sec-fetch-Site", "same-site")
-	h.Set("Referer", "https://chat.zalo.me/")
+	h.Set("Referer", config.DefaultURL.String()+"/")
 	h.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-	opts := httpx.RequestOptions{
-		Headers: h,
-		Method:  "GET",
-	}
-
+	opts := httpx.RequestOptions{Headers: h, Method: http.MethodGet}
 	resp, err := httpx.Request(ctx, sc, "https://jr.chat.zalo.me/jr/userinfo", &opts)
 	if err != nil {
 		return nil, err
 	}
-
 	defer resp.Body.Close()
 
 	var body httpx.Response[QRUserInfo]

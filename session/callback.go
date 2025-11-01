@@ -4,10 +4,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/model"
 )
-
-const defaultTTL = 5 * time.Minute
 
 type UploadCallback = func(data model.UploadAttachment)
 
@@ -26,7 +25,7 @@ func NewCallbacksMap() *CallbacksMap {
 
 func (c *CallbacksMap) Set(key string, value UploadCallback, ttl time.Duration) *CallbacksMap {
 	if ttl <= 0 {
-		ttl = defaultTTL
+		ttl = config.DefaultUploadCallbackTTL
 	}
 
 	c.mu.Lock()

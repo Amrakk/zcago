@@ -27,7 +27,24 @@ type Buffers struct {
 }
 
 func defaultBuffers() Buffers {
-	return Buffers{Connected: 1, Disconnected: 4, Closed: 1, Error: 16, Message: 64, Undo: 32, CipherKey: 4, UploadAttachment: 32}
+	return Buffers{
+		Connected:    1,
+		Disconnected: 4,
+		Closed:       1,
+		Error:        16,
+		// Typing:      8,
+		Message: 64,
+		// OldMessage:       64,
+		// SeenMessage:      8,
+		// DeliveredMessage: 8,
+		// Reaction:         64,
+		// OldReaction:      64,
+		Undo:             32,
+		UploadAttachment: 32,
+		// Friend:           32,
+		// Group:            32,
+		CipherKey: 4,
+	}
 }
 
 type channels struct {

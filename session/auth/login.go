@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/cryptox"
 	"github.com/Amrakk/zcago/internal/httpx"
@@ -153,7 +154,7 @@ func generateServerInfoParams(sc session.MutableContext, encryptParams bool) (ma
 		"imei":           sc.IMEI(),
 		"type":           sc.APIType(),
 		"client_version": sc.APIVersion(),
-		"computer_name":  "Web",
+		"computer_name":  config.DefaultComputerName,
 	}
 
 	return params, nil

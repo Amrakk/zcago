@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/model"
 )
@@ -66,7 +67,7 @@ func newContextImpl(optFns ...Option) *contextImpl {
 		},
 		jar:             jar,
 		uploadCallbacks: NewCallbacksMap(),
-		language:        "vi",
+		language:        config.DefaultLanguage,
 	}
 }
 

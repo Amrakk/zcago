@@ -1,6 +1,29 @@
 package config
 
-const MaxMessagesPerRequest = 50
+import (
+	"net/url"
+	"time"
+)
+
+const (
+	DefaultUserAgent         = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
+	DefaultLanguage          = "vi"
+	DefaultAPIType           = 30
+	DefaultAPIVersion        = 665
+	DefaultComputerName      = "Web"
+	DefaultUploadCallbackTTL = 5 * time.Minute
+
+	DefaultQRPath  = "qr.png"
+	DefaultUIDSelf = "0"
+
+	MaxMessagesPerRequest = 50
+)
+
+var DefaultURL = url.URL{Scheme: "https", Host: "chat.zalo.me"}
+
+// ----------------------------------------
+// Attachment
+// ----------------------------------------
 
 const (
 	KiB = 1 << 10

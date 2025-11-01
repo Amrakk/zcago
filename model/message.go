@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strconv"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 )
 
@@ -33,16 +34,16 @@ func NewUserMessage(uid string, data TMessage) UserMessage {
 		Type:     ThreadTypeUser,
 		Data:     data,
 		ThreadID: data.UIDFrom,
-		IsSelf:   data.UIDFrom == "0",
+		IsSelf:   data.UIDFrom == config.DefaultUIDSelf,
 	}
 
-	if data.UIDFrom == "0" {
+	if data.UIDFrom == config.DefaultUIDSelf {
 		msg.ThreadID = data.IDTo
 	}
-	if data.IDTo == "0" {
+	if data.IDTo == config.DefaultUIDSelf {
 		msg.Data.IDTo = uid
 	}
-	if data.UIDFrom == "0" {
+	if data.UIDFrom == config.DefaultUIDSelf {
 		msg.Data.UIDFrom = uid
 	}
 
@@ -65,10 +66,10 @@ func NewGroupMessage(uid string, data TGroupMessage) GroupMessage {
 		Type:     ThreadTypeGroup,
 		Data:     data,
 		ThreadID: data.IDTo,
-		IsSelf:   data.UIDFrom == "0",
+		IsSelf:   data.UIDFrom == config.DefaultUIDSelf,
 	}
 
-	if data.UIDFrom == "0" {
+	if data.UIDFrom == config.DefaultUIDSelf {
 		g.Data.UIDFrom = uid
 	}
 
@@ -172,6 +173,8 @@ type MentionType int
 const (
 	MentionEach MentionType = iota
 	MentionAll
+
+	MentionAllUID = "-1"
 )
 
 type TMention struct {
@@ -182,10 +185,10 @@ type TMention struct {
 }
 
 func (m *TMention) IsValid() bool {
-	if m.Type == 1 && m.UID == "-1" {
+	if m.Type == 1 && m.UID == MentionAllUID {
 		return true
 	}
-	if m.Type == 0 && m.UID != "" && m.UID != "-1" && m.Len > 0 {
+	if m.Type == 0 && m.UID != "" && m.UID != MentionAllUID && m.Len > 0 {
 		return true
 	}
 	return false

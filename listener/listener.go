@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/httpx"
 	"github.com/Amrakk/zcago/internal/websocketx"
@@ -153,7 +154,7 @@ func (ln *listener) createWebSocketConnection(ctx context.Context) (websocketx.C
 	h.Set("Accept-Language", "en-US,en;q=0.9")
 	h.Set("Cache-Control", "no-cache")
 	h.Set("Host", u.Host)
-	h.Set("Origin", "https://chat.zalo.me")
+	h.Set("Origin", config.DefaultURL.String())
 	h.Set("Pragma", "no-cache")
 	h.Set("User-Agent", ln.userAgent)
 

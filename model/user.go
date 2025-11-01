@@ -3,8 +3,8 @@ package model
 type Gender int
 
 const (
-	Male   Gender = 0
-	Female Gender = 1
+	Male Gender = iota
+	Female
 )
 
 type User struct {

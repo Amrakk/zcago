@@ -1,5 +1,7 @@
 package model
 
+import "github.com/Amrakk/zcago/config"
+
 type TUndoContent struct {
 	GlobalMsgID int64 `json:"globalMsgId"`
 	CliMsgID    int64 `json:"cliMsgId"`
@@ -39,20 +41,20 @@ type Undo struct {
 func NewUndo(uid string, data TUndo, isGroup bool) Undo {
 	u := Undo{
 		Data:    data,
-		IsSelf:  data.UIDFrom == "0",
+		IsSelf:  data.UIDFrom == config.DefaultUIDSelf,
 		IsGroup: isGroup,
 	}
 
-	if isGroup || data.UIDFrom == "0" {
+	if isGroup || data.UIDFrom == config.DefaultUIDSelf {
 		u.ThreadID = data.IDTo
 	} else {
 		u.ThreadID = data.UIDFrom
 	}
 
-	if u.Data.IDTo == "0" {
+	if u.Data.IDTo == config.DefaultUIDSelf {
 		u.Data.IDTo = uid
 	}
-	if u.Data.UIDFrom == "0" {
+	if u.Data.UIDFrom == config.DefaultUIDSelf {
 		u.Data.UIDFrom = uid
 	}
 

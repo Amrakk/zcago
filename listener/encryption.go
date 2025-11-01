@@ -20,9 +20,9 @@ const (
 	EncryptionTypeBase64    uint = 1
 	EncryptionTypeAESGCM    uint = 2
 	EncryptionTypeAESGCMRaw uint = 3
-)
 
-const minEncryptedDataLength = 48
+	minEncryptedDataLength = 48
+)
 
 func encodeFrame(p WSPayload) ([]byte, error) {
 	if p.Data == nil {

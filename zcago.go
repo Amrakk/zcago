@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
-	"net/url"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Amrakk/zcago/api"
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
@@ -45,11 +45,9 @@ func (z *zalo) Login(ctx context.Context, cred Credentials) (API, error) {
 
 // LoginQR performs interactive QR code authentication.
 func (z *zalo) LoginQR(ctx context.Context, opts *LoginQROption, cb LoginQRCallback) (API, error) {
-	const defaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
-
 	options := LoginQROption{
-		UserAgent: defaultUA,
-		Language:  "vi",
+		UserAgent: config.DefaultUserAgent,
+		Language:  config.DefaultLanguage,
 	}
 	if opts != nil {
 		if opts.UserAgent != "" {
@@ -98,7 +96,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 		return nil, errs.NewZCA("invalid credentials", "zalo.loginCookie")
 	}
 
-	lang := "vi"
+	lang := config.DefaultLanguage
 	if cred.Language != nil && *cred.Language != "" {
 		lang = *cred.Language
 	}
@@ -109,8 +107,7 @@ func (z *zalo) loginCookie(ctx context.Context, sc session.MutableContext, cred 
 	// Apply saved cookies if provided
 	// Skip if invalid/empty
 	if cred.Cookie != nil && cred.Cookie.IsValid() {
-		u := url.URL{Scheme: "https", Host: "chat.zalo.me"}
-		cred.Cookie.BuildCookieJar(&u, sc.CookieJar())
+		cred.Cookie.BuildCookieJar(&config.DefaultURL, sc.CookieJar())
 	}
 
 	var (

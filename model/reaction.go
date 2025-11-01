@@ -1,5 +1,7 @@
 package model
 
+import "github.com/Amrakk/zcago/config"
+
 type ReactionIcon string
 
 const (
@@ -60,6 +62,8 @@ const (
 	ReactionNone        ReactionIcon = ``
 
 	// more...
+
+	DefaultReactionSource = 6
 )
 
 var reactionType = map[ReactionIcon]int{
@@ -134,14 +138,14 @@ type Reaction struct {
 }
 
 func NewReaction(uid string, data TReaction, threadType ThreadType) Reaction {
-	if data.IDTo == "0" {
+	if data.IDTo == config.DefaultUIDSelf {
 		data.IDTo = uid
 	}
-	if data.UIDFrom == "0" {
+	if data.UIDFrom == config.DefaultUIDSelf {
 		data.UIDFrom = uid
 	}
 
-	isSelf := data.UIDFrom == "0"
+	isSelf := data.UIDFrom == config.DefaultUIDSelf
 
 	threadID := data.UIDFrom
 	if threadType == ThreadTypeGroup || isSelf {
@@ -178,7 +182,7 @@ type ReactionData struct {
 func NewReactionData(icon ReactionIcon) ReactionData {
 	return ReactionData{
 		RIcon:  icon,
-		Source: 6,
+		Source: DefaultReactionSource,
 		RType:  icon.TypeCode(),
 	}
 }
