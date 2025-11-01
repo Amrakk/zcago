@@ -15,6 +15,12 @@ const (
 	UrgUrgent
 )
 
+type Message interface {
+	GetType() ThreadType
+	GetThreadID() string
+	IsSelfMsg() bool
+}
+
 type UserMessage struct {
 	Type     ThreadType
 	Data     TMessage
@@ -43,6 +49,10 @@ func NewUserMessage(uid string, data TMessage) UserMessage {
 	return msg
 }
 
+func (m UserMessage) GetType() ThreadType { return m.Type }
+func (m UserMessage) GetThreadID() string { return m.ThreadID }
+func (m UserMessage) IsSelfMsg() bool     { return m.IsSelf }
+
 type GroupMessage struct {
 	Type     ThreadType
 	Data     TGroupMessage
@@ -50,8 +60,8 @@ type GroupMessage struct {
 	IsSelf   bool
 }
 
-func NewGroupMessage(uid string, data TGroupMessage) *GroupMessage {
-	g := &GroupMessage{
+func NewGroupMessage(uid string, data TGroupMessage) GroupMessage {
+	g := GroupMessage{
 		Type:     ThreadTypeGroup,
 		Data:     data,
 		ThreadID: data.IDTo,
@@ -64,6 +74,10 @@ func NewGroupMessage(uid string, data TGroupMessage) *GroupMessage {
 
 	return g
 }
+
+func (m GroupMessage) GetType() ThreadType { return m.Type }
+func (m GroupMessage) GetThreadID() string { return m.ThreadID }
+func (m GroupMessage) IsSelfMsg() bool     { return m.IsSelf }
 
 type TMessage struct {
 	ActionID          string       `json:"actionId"`

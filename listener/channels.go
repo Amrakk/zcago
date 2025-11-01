@@ -35,13 +35,13 @@ type channels struct {
 	Disconnected chan websocketx.CloseInfo
 	Closed       chan websocketx.CloseInfo
 	Error        chan error
-	// Typing           chan Typing
-	Message chan model.UserMessage
+	Message      chan model.Message
 	// OldMessage       chan OldMessages
-	// SeenMessage      chan []SeenMessage
-	// DeliveredMessage chan []DeliveredMessage
 	// Reaction         chan Reaction
 	// OldReaction      chan OldReactions
+	// Typing           chan Typing
+	// DeliveredMessage chan []DeliveredMessage
+	// SeenMessage      chan []SeenMessage
 	Undo             chan model.Undo
 	UploadAttachment chan model.UploadAttachment
 	// Friend           chan Friend
@@ -53,15 +53,14 @@ func (ln *listener) Connected() <-chan struct{}                { return ln.ch.Co
 func (ln *listener) Disconnected() <-chan websocketx.CloseInfo { return ln.ch.Disconnected }
 func (ln *listener) Closed() <-chan websocketx.CloseInfo       { return ln.ch.Closed }
 func (ln *listener) Error() <-chan error                       { return ln.ch.Error }
-
-// func (ln *listener) Typing() <-chan Typing                       { return ln.ch.Typing }
-func (ln *listener) Message() <-chan model.UserMessage { return ln.ch.Message }
+func (ln *listener) Message() <-chan model.Message             { return ln.ch.Message }
 
 // func (ln *listener) OldMessage() <-chan OldMessages              { return ln.ch.OldMessage }
-// func (ln *listener) SeenMessage() <-chan []SeenMessage           { return ln.ch.SeenMessage }
-// func (ln *listener) DeliveredMessage() <-chan []DeliveredMessage { return ln.ch.DeliveredMessage }
 // func (ln *listener) Reaction() <-chan Reaction                   { return ln.ch.Reaction }
 // func (ln *listener) OldReaction() <-chan OldReactions            { return ln.ch.OldReaction }
+// func (ln *listener) Typing() <-chan Typing                       { return ln.ch.Typing }
+// func (ln *listener) DeliveredMessage() <-chan []DeliveredMessage { return ln.ch.DeliveredMessage }
+// func (ln *listener) SeenMessage() <-chan []SeenMessage           { return ln.ch.SeenMessage }
 func (ln *listener) Undo() <-chan model.Undo                         { return ln.ch.Undo }
 func (ln *listener) UploadAttachment() <-chan model.UploadAttachment { return ln.ch.UploadAttachment }
 

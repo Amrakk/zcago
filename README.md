@@ -45,13 +45,57 @@ cred := &zcago.Credentials{
     UserAgent: "user-agent"
 }
 zalo := zcago.NewZalo()
-api, err:= zalo.Login(cred)
+api, err := zalo.Login(cred)
 ```
 
 ### Listen for new messages
 
 ```go
+import (
+	"context"
+	"log"
+	"os/signal"
+	"syscall"
 
+	"github.com/Amrakk/zcago"
+	"github.com/Amrakk/zcago/model"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+
+	z := zcago.NewZalo()
+	a, err := z.LoginQR(ctx, nil, nil)
+	if err != nil {
+		log.Fatalf("login failed: %v", err)
+	}
+
+	ln := a.Listener()
+	if err := ln.Start(ctx, true); err != nil {
+		log.Fatalf("listener start error: %v", err)
+	}
+
+	defer stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case m, ok := <-ln.Message():
+			if !ok {
+				return
+			}
+
+			switch v := m.(type) {
+			case model.UserMessage:
+				// received message in direct message
+			case model.GroupMessage:
+				// received message in group message
+			default:
+				continue
+			}
+		}
+	}
+}
 ```
 
 > [IMPORTANT]
@@ -60,7 +104,34 @@ api, err:= zalo.Login(cred)
 ### Send a message
 
 ```go
+import (
+	"context"
+	"log"
 
+	"github.com/Amrakk/zcago"
+	"github.com/Amrakk/zcago/api"
+	"github.com/Amrakk/zcago/model"
+)
+
+func main() {
+	ctx := context.Background()
+
+	z := zcago.NewZalo()
+	a, err := z.LoginQR(ctx, nil, nil)
+	if err != nil {
+		log.Fatalf("login failed: %v", err)
+	}
+
+	userID := "123456789"
+	message := api.MessageContent{Msg: "Hello from ZCAGO!"}
+
+	response, err := a.SendMessage(ctx, userID, model.ThreadTypeUser, message)
+	if err != nil {
+		log.Fatalf("failed to send message: %v", err)
+	}
+
+	log.Printf("Message sent successfully! Message ID: %s", response.Message.MsgID)
+}
 ```
 
 ---

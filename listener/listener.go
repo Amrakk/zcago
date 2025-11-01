@@ -30,13 +30,13 @@ type Listener interface {
 	Disconnected() <-chan websocketx.CloseInfo
 	Closed() <-chan websocketx.CloseInfo
 	Error() <-chan error
-	// Typing() <-chan Typing
-	Message() <-chan model.UserMessage
+	Message() <-chan model.Message
 	// OldMessage() <-chan OldMessages
-	// SeenMessage() <-chan []SeenMessage
-	// DeliveredMessage() <-chan []DeliveredMessage
 	// Reaction() <-chan Reaction
 	// OldReaction() <-chan OldReactions
+	// Typing() <-chan Typing
+	// DeliveredMessage() <-chan []DeliveredMessage
+	// SeenMessage() <-chan []SeenMessage
 	Undo() <-chan model.Undo
 	UploadAttachment() <-chan model.UploadAttachment
 	// Friend() <-chan Friend
@@ -341,13 +341,13 @@ func initializeChannels() channels {
 		Disconnected: make(chan websocketx.CloseInfo, buf.Disconnected),
 		Closed:       make(chan websocketx.CloseInfo, buf.Closed),
 		Error:        make(chan error, buf.Error),
-		// Typing: make(chan Typing, buf.Typing),
-		Message: make(chan model.UserMessage, buf.Message),
+		Message:      make(chan model.Message, buf.Message),
 		// OldMessages: make(chan OldMessagesEvent, buf.OldMessages),
-		// SeenMessages: make(chan []SeenMessage, buf.SeenMessages),
-		// DeliveredMessages: make(chan []DeliveredMessage, buf.DeliveredMessages),
 		// Reaction: make(chan Reaction, buf.Reaction),
 		// OldReactions: make(chan OldReactionsEvent, buf.OldReactions),
+		// Typing: make(chan Typing, buf.Typing),
+		// DeliveredMessages: make(chan []DeliveredMessage, buf.DeliveredMessages),
+		// SeenMessages: make(chan []SeenMessage, buf.SeenMessages),
 		Undo:             make(chan model.Undo, buf.Undo),
 		UploadAttachment: make(chan model.UploadAttachment, buf.UploadAttachment),
 		// Friend: make(chan FriendEvent, buf.Friend),

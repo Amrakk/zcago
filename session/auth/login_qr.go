@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -173,9 +172,6 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 
 	getLoginInfo(ctx, sc, ver)
 	verifyClient(ctx, sc, ver)
-
-	jar := sc.CookieJar()
-	fmt.Println(jar.Cookies(&url.URL{Host: "id.zalo.me", Scheme: "https"}))
 
 	qrData, imgBytes, err := generateAndProcessQR(ctx, sc, ver)
 	if err != nil {

@@ -22,6 +22,9 @@ func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body Bas
 	case "1_501_0":
 		ln.handleMessages(ctx, body)
 
+	case "1_521_0":
+		ln.handleGroupMessages(ctx, body)
+
 	case "1_601_0":
 		ln.handleControls(ctx, body)
 
@@ -86,7 +89,32 @@ func (ln *listener) handleMessages(ctx context.Context, body BaseWSMessage) {
 			if messageObject.IsSelf && !ln.selfListen {
 				continue
 			}
-			emit(ctx, ln.ch.Message, messageObject)
+			emit(ctx, ln.ch.Message, model.Message(messageObject))
+		}
+	}
+}
+
+func (ln *listener) handleGroupMessages(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.GroupMessageEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleGroupMessages", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	for _, msg := range eventData.Data.GroupMsgs {
+		if msg.Undo != nil {
+			undoObject := model.NewUndo(ln.sc.UID(), *msg.Undo, true)
+			if undoObject.IsSelf && !ln.selfListen {
+				continue
+			}
+			emit(ctx, ln.ch.Undo, undoObject)
+		} else if msg.Message != nil {
+			messageObject := model.NewGroupMessage(ln.sc.UID(), *msg.Message)
+			if messageObject.IsSelf && !ln.selfListen {
+				continue
+			}
+			emit(ctx, ln.ch.Message, model.Message(messageObject))
 		}
 	}
 }
