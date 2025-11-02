@@ -13,14 +13,14 @@ type controlItem struct {
 }
 
 type controlContent struct {
-	ActionType string         `json:"act_type"`
-	Action     string         `json:"act"`
-	Data       controlPayload `json:"data"`
+	ActionType string      `json:"act_type"`
+	Action     string      `json:"act"`
+	Data       controlData `json:"data"`
 
 	FileID *int64 `json:"fileId,omitempty"`
 }
 
-type controlPayload struct {
+type controlData struct {
 	UploadAttachment *uploadFileInfo `json:"uploadAttachment,omitempty"`
 }
 
@@ -40,7 +40,7 @@ func (d *ControlEventData) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (m *controlPayload) UnmarshalJSON(data []byte) error {
+func (m *controlData) UnmarshalJSON(data []byte) error {
 	if data[0] == '"' {
 		var s string
 		if err := json.Unmarshal(data, &s); err != nil {

@@ -17,28 +17,28 @@ const (
 )
 
 type Message interface {
-	GetType() ThreadType
-	GetThreadID() string
-	IsSelfMsg() bool
+	Type() ThreadType
+	ThreadID() string
+	IsSelf() bool
 }
 
 type UserMessage struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TMessage
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewUserMessage(uid string, data TMessage) UserMessage {
 	msg := UserMessage{
-		Type:     ThreadTypeUser,
+		typ:      ThreadTypeUser,
 		Data:     data,
-		ThreadID: data.UIDFrom,
-		IsSelf:   data.UIDFrom == config.DefaultUIDSelf,
+		threadID: data.UIDFrom,
+		isSelf:   data.UIDFrom == config.DefaultUIDSelf,
 	}
 
 	if data.UIDFrom == config.DefaultUIDSelf {
-		msg.ThreadID = data.IDTo
+		msg.threadID = data.IDTo
 	}
 	if data.IDTo == config.DefaultUIDSelf {
 		msg.Data.IDTo = uid
@@ -50,23 +50,23 @@ func NewUserMessage(uid string, data TMessage) UserMessage {
 	return msg
 }
 
-func (m UserMessage) GetType() ThreadType { return m.Type }
-func (m UserMessage) GetThreadID() string { return m.ThreadID }
-func (m UserMessage) IsSelfMsg() bool     { return m.IsSelf }
+func (m UserMessage) Type() ThreadType { return m.typ }
+func (m UserMessage) ThreadID() string { return m.threadID }
+func (m UserMessage) IsSelf() bool     { return m.isSelf }
 
 type GroupMessage struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TGroupMessage
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewGroupMessage(uid string, data TGroupMessage) GroupMessage {
 	g := GroupMessage{
-		Type:     ThreadTypeGroup,
+		typ:      ThreadTypeGroup,
 		Data:     data,
-		ThreadID: data.IDTo,
-		IsSelf:   data.UIDFrom == config.DefaultUIDSelf,
+		threadID: data.IDTo,
+		isSelf:   data.UIDFrom == config.DefaultUIDSelf,
 	}
 
 	if data.UIDFrom == config.DefaultUIDSelf {
@@ -76,9 +76,9 @@ func NewGroupMessage(uid string, data TGroupMessage) GroupMessage {
 	return g
 }
 
-func (m GroupMessage) GetType() ThreadType { return m.Type }
-func (m GroupMessage) GetThreadID() string { return m.ThreadID }
-func (m GroupMessage) IsSelfMsg() bool     { return m.IsSelf }
+func (m GroupMessage) Type() ThreadType { return m.typ }
+func (m GroupMessage) ThreadID() string { return m.threadID }
+func (m GroupMessage) IsSelf() bool     { return m.isSelf }
 
 type TMessage struct {
 	ActionID          string       `json:"actionId"`

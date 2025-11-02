@@ -77,16 +77,17 @@ func (ln *listener) handleMessages(ctx context.Context, body BaseWSMessage) {
 		return
 	}
 
+	uid := ln.sc.UID()
 	for _, msg := range eventData.Data.Msgs {
 		if msg.Undo != nil {
-			undoObject := model.NewUndo(ln.sc.UID(), *msg.Undo, false)
+			undoObject := model.NewUndo(uid, *msg.Undo, false)
 			if undoObject.IsSelf && !ln.selfListen {
 				continue
 			}
 			emit(ctx, ln.ch.Undo, undoObject)
 		} else if msg.Message != nil {
-			messageObject := model.NewUserMessage(ln.sc.UID(), *msg.Message)
-			if messageObject.IsSelf && !ln.selfListen {
+			messageObject := model.NewUserMessage(uid, *msg.Message)
+			if messageObject.IsSelf() && !ln.selfListen {
 				continue
 			}
 			emit(ctx, ln.ch.Message, model.Message(messageObject))
@@ -111,7 +112,7 @@ func (ln *listener) handleGroupMessages(ctx context.Context, body BaseWSMessage)
 			emit(ctx, ln.ch.Undo, undoObject)
 		} else if msg.Message != nil {
 			messageObject := model.NewGroupMessage(ln.sc.UID(), *msg.Message)
-			if messageObject.IsSelf && !ln.selfListen {
+			if messageObject.IsSelf() && !ln.selfListen {
 				continue
 			}
 			emit(ctx, ln.ch.Message, model.Message(messageObject))

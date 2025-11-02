@@ -49,9 +49,9 @@ func main() {
 				continue
 			}
 
-			log.Printf("%s %s\n", m.GetThreadID(), msg)
-			if _, err := a.SendMessage(ctx, m.GetThreadID(), m.GetType(), api.MessageContent{Msg: msg}); err != nil {
-				log.Printf("send failed (thread %s): %v", m.GetThreadID(), err)
+			log.Printf("%s %s\n", m.ThreadID(), msg)
+			if _, err := a.SendMessage(ctx, m.ThreadID(), m.Type(), api.MessageContent{Msg: msg}); err != nil {
+				log.Printf("send failed (thread %s): %v", m.ThreadID(), err)
 			}
 		}
 	}

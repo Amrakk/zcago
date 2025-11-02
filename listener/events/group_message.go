@@ -3,7 +3,6 @@ package events
 import (
 	"encoding/json"
 
-	"github.com/Amrakk/zcago/errs"
 	"github.com/Amrakk/zcago/model"
 )
 
@@ -27,15 +26,6 @@ func (m *groupMessageOrUndo) UnmarshalJSON(data []byte) error {
 		m.Message = &tm
 		return nil
 	}
-	return nil
-}
 
-func (m groupMessageOrUndo) MarshalJSON() ([]byte, error) {
-	if m.Message != nil {
-		return json.Marshal(m.Message)
-	}
-	if m.Undo != nil {
-		return json.Marshal(m.Undo)
-	}
-	return nil, errs.NewZCA("both Message and Undo are nil", "groupMessageOrUndo.MarshalJSON")
+	return nil
 }
