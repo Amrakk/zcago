@@ -3,7 +3,6 @@
 ## High Priority
 
 -   **SendMessage API** - Handle sending attachment
--   **Listener Events** - Listen to websocket events
 
 ## Low Priority
 
