@@ -160,6 +160,18 @@ func NewReaction(uid string, data TReaction, threadType ThreadType) Reaction {
 	}
 }
 
+type OldReactions struct {
+	Reactions  []Reaction
+	ThreadType ThreadType
+}
+
+func NewOldReactions(reactions []Reaction, threadType ThreadType) OldReactions {
+	return OldReactions{
+		Reactions:  reactions,
+		ThreadType: threadType,
+	}
+}
+
 type TReaction struct {
 	ActionID string          `json:"actionId"`
 	MsgID    string          `json:"msgId"`
@@ -197,7 +209,7 @@ type ReactionContent struct {
 }
 
 type ReactionMessageRef struct {
-	GMsgID  string `json:"gMsgID"`
-	CMsgID  string `json:"cMsgID"`
-	MsgType int    `json:"msgType"`
+	GMsgID  int `json:"gMsgID"`
+	CMsgID  int `json:"cMsgID"`
+	MsgType int `json:"msgType"`
 }

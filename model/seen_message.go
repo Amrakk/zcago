@@ -2,37 +2,51 @@ package model
 
 import "slices"
 
+type SeenMessage interface {
+	Type() ThreadType
+	ThreadID() string
+	IsSelf() bool
+}
+
 type UserSeenMessage struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TUserSeenMessage
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewUserSeenMessage(data TUserSeenMessage) UserSeenMessage {
 	return UserSeenMessage{
-		Type:     ThreadTypeUser,
+		typ:      ThreadTypeUser,
 		Data:     data,
-		ThreadID: data.IDTo,
-		IsSelf:   false,
+		threadID: data.IDTo,
+		isSelf:   false,
 	}
 }
 
+func (usm UserSeenMessage) Type() ThreadType { return usm.typ }
+func (usm UserSeenMessage) ThreadID() string { return usm.threadID }
+func (usm UserSeenMessage) IsSelf() bool     { return usm.isSelf }
+
 type GroupSeenMessage struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TGroupSeenMessage
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewGroupSeenMessage(uid string, data TGroupSeenMessage) GroupSeenMessage {
 	return GroupSeenMessage{
-		Type:     ThreadTypeGroup,
+		typ:      ThreadTypeGroup,
 		Data:     data,
-		ThreadID: data.GroupID,
-		IsSelf:   slices.Contains(data.SeenUIDs, uid),
+		threadID: data.GroupID,
+		isSelf:   slices.Contains(data.SeenUIDs, uid),
 	}
 }
+
+func (gsm GroupSeenMessage) Type() ThreadType { return gsm.typ }
+func (gsm GroupSeenMessage) ThreadID() string { return gsm.threadID }
+func (gsm GroupSeenMessage) IsSelf() bool     { return gsm.isSelf }
 
 type TUserSeenMessage struct {
 	IDTo      string `json:"idTo"`

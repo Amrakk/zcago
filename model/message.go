@@ -80,6 +80,18 @@ func (m GroupMessage) Type() ThreadType { return m.typ }
 func (m GroupMessage) ThreadID() string { return m.threadID }
 func (m GroupMessage) IsSelf() bool     { return m.isSelf }
 
+type OldMessages struct {
+	Messages   []Message
+	ThreadType ThreadType
+}
+
+func NewOldMessage(messages []Message, threadType ThreadType) OldMessages {
+	return OldMessages{
+		Messages:   messages,
+		ThreadType: threadType,
+	}
+}
+
 type TMessage struct {
 	ActionID          string       `json:"actionId"`
 	MsgID             string       `json:"msgId"`
@@ -166,6 +178,16 @@ type TAttachmentContent struct {
 	Type        string `json:"type"`
 }
 
+type TDeletedContent struct {
+	Type           int `json:"type"`
+	ActionType     int `json:"actionType"`
+	UIDFrom        int `json:"uidFrom"`
+	UIDTo          int `json:"uidTo"`
+	ClientDelMsgId int `json:"clientDelMsgId"`
+	GlobalDelMsgId int `json:"globalDelMsgId"`
+	DestId         int `json:"destId"`
+}
+
 type TOtherContent map[string]any
 
 type MentionType int
@@ -195,9 +217,11 @@ func (m *TMention) IsValid() bool {
 }
 
 type Content struct {
-	String     *string
-	Attachment *TAttachmentContent
-	Other      TOtherContent
+	String         *string
+	Attachment     *TAttachmentContent
+	DeletedContent []TDeletedContent
+	Other          TOtherContent
+	//    []TOtherContent
 }
 
 func (c *Content) UnmarshalJSON(data []byte) error {
@@ -210,6 +234,12 @@ func (c *Content) UnmarshalJSON(data []byte) error {
 	var attach TAttachmentContent
 	if err := json.Unmarshal(data, &attach); err == nil && attach.Title != "" {
 		c.Attachment = &attach
+		return nil
+	}
+
+	var deletedContent []TDeletedContent
+	if err := json.Unmarshal(data, &deletedContent); err == nil {
+		c.DeletedContent = deletedContent
 		return nil
 	}
 
@@ -228,6 +258,9 @@ func (c Content) MarshalJSON() ([]byte, error) {
 	}
 	if c.Attachment != nil {
 		return json.Marshal(c.Attachment)
+	}
+	if c.DeletedContent != nil {
+		return json.Marshal(c.DeletedContent)
 	}
 	if c.Other != nil {
 		return json.Marshal(c.Other)

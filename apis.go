@@ -820,8 +820,6 @@ type API interface {
 	//   - message - message content
 	//
 	// Errors: errs.ZaloAPIError, errs.ErrMissingImageMetadataGetter
-	//
-	// TODO: test this api
 	SendMessage(ctx context.Context, threadID string, threadType model.ThreadType, message api.MessageContent) (*api.SendMessageResponse, error)
 	// SendReport sends a report to Zalo.
 	//

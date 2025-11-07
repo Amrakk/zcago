@@ -15,6 +15,13 @@ const (
 	DestTypePage  DestType = 5
 )
 
+type EventType int
+
+const (
+	EventTypeGroup EventType = iota
+	EventTypeFriend
+)
+
 // BinBankCard represents the BIN codes of
 // banks supported by Zalo, collected via MITM inspection on the mobile app.
 //

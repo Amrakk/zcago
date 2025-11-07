@@ -15,6 +15,8 @@ import (
 func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body BaseWSMessage) {
 	key := fmt.Sprintf("%d_%d_%d", version, cmd, sub)
 
+	fmt.Println(key)
+
 	switch key {
 	case "1_1_1":
 		ln.handleCipherKey(ctx, body)
@@ -22,11 +24,29 @@ func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body Bas
 	case "1_501_0":
 		ln.handleMessages(ctx, body)
 
+	case "1_502_0":
+		ln.handleMessagesStatus(ctx, body)
+
+	case "1_510_1", "1_511_1":
+		ln.handleOldMessages(ctx, body)
+
 	case "1_521_0":
 		ln.handleGroupMessages(ctx, body)
 
+	case "1_522_0":
+		ln.handleGroupMessagesStatus(ctx, body)
+
 	case "1_601_0":
 		ln.handleControls(ctx, body)
+
+	case "1_602_0":
+		ln.handleActions(ctx, body)
+
+	case "1_610_1", "1_611_1":
+		ln.handleOldReactions(ctx, body)
+
+	case "1_612_0":
+		ln.handleReactions(ctx, body)
 
 	case "1_3000_0":
 		ln.handleDuplicateConnection()
@@ -80,18 +100,69 @@ func (ln *listener) handleMessages(ctx context.Context, body BaseWSMessage) {
 	uid := ln.sc.UID()
 	for _, msg := range eventData.Data.Msgs {
 		if msg.Undo != nil {
-			undoObject := model.NewUndo(uid, *msg.Undo, false)
-			if undoObject.IsSelf && !ln.selfListen {
+			undo := model.NewUndo(uid, *msg.Undo, false)
+			if undo.IsSelf && !ln.selfListen {
 				continue
 			}
-			emit(ctx, ln.ch.Undo, undoObject)
+			emit(ctx, ln.ch.Undo, undo)
 		} else if msg.Message != nil {
-			messageObject := model.NewUserMessage(uid, *msg.Message)
-			if messageObject.IsSelf() && !ln.selfListen {
+			message := model.NewUserMessage(uid, *msg.Message)
+			if message.IsSelf() && !ln.selfListen {
 				continue
 			}
-			emit(ctx, ln.ch.Message, model.Message(messageObject))
+			emit(ctx, ln.ch.Message, model.Message(message))
 		}
+	}
+}
+
+func (ln *listener) handleOldMessages(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.OldMessagesEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleOldMessages", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	messages := make([]model.Message, 0, len(eventData.Data.Msgs)+len(eventData.Data.GroupMsgs))
+
+	threadType := model.ThreadTypeUser
+	selected := eventData.Data.Msgs
+	if len(eventData.Data.GroupMsgs) > 0 {
+		threadType = model.ThreadTypeGroup
+		selected = eventData.Data.GroupMsgs
+	}
+
+	uid := ln.sc.UID()
+	for _, msg := range selected {
+		messageObject := model.NewUserMessage(uid, msg)
+		messages = append(messages, messageObject)
+	}
+
+	emit(ctx, ln.ch.OldMessages, model.NewOldMessage(messages, threadType))
+}
+
+func (ln *listener) handleMessagesStatus(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.MessageStatusEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleMessagesStatus", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	// Always triggered by others; no self-check needed
+	if len(eventData.Data.DeliveredMessages) > 0 {
+		deliveredMsgs := make([]model.DeliveredMessage, 0, len(eventData.Data.DeliveredMessages))
+		for _, dm := range eventData.Data.DeliveredMessages {
+			deliveredMsgs = append(deliveredMsgs, model.NewUserDeliveredMessage(dm))
+		}
+		emit(ctx, ln.ch.DeliveredMessages, deliveredMsgs)
+	}
+	if len(eventData.Data.SeenMessages) > 0 {
+		seenMsgs := make([]model.SeenMessage, 0, len(eventData.Data.SeenMessages))
+		for _, sm := range eventData.Data.SeenMessages {
+			seenMsgs = append(seenMsgs, model.NewUserSeenMessage(sm))
+		}
+		emit(ctx, ln.ch.SeenMessages, seenMsgs)
 	}
 }
 
@@ -105,17 +176,126 @@ func (ln *listener) handleGroupMessages(ctx context.Context, body BaseWSMessage)
 
 	for _, msg := range eventData.Data.GroupMsgs {
 		if msg.Undo != nil {
-			undoObject := model.NewUndo(ln.sc.UID(), *msg.Undo, true)
-			if undoObject.IsSelf && !ln.selfListen {
+			undo := model.NewUndo(ln.sc.UID(), *msg.Undo, true)
+			if undo.IsSelf && !ln.selfListen {
 				continue
 			}
-			emit(ctx, ln.ch.Undo, undoObject)
+			emit(ctx, ln.ch.Undo, undo)
 		} else if msg.Message != nil {
-			messageObject := model.NewGroupMessage(ln.sc.UID(), *msg.Message)
-			if messageObject.IsSelf() && !ln.selfListen {
+			message := model.NewGroupMessage(ln.sc.UID(), *msg.Message)
+			if message.IsSelf() && !ln.selfListen {
 				continue
 			}
-			emit(ctx, ln.ch.Message, model.Message(messageObject))
+			emit(ctx, ln.ch.Message, model.Message(message))
+		}
+	}
+}
+
+func (ln *listener) handleGroupMessagesStatus(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.GroupMessageStatusEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleGroupMessagesStatus", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	uid := ln.sc.UID()
+	if len(eventData.Data.DeliveredMessages) > 0 {
+		deliveredMsgs := make([]model.DeliveredMessage, 0, len(eventData.Data.DeliveredMessages))
+		for _, dm := range eventData.Data.DeliveredMessages {
+			deliveredObject := model.NewGroupDeliveredMessage(uid, dm)
+			if deliveredObject.IsSelf() && !ln.selfListen {
+				continue
+			}
+			deliveredMsgs = append(deliveredMsgs, deliveredObject)
+
+		}
+		emit(ctx, ln.ch.DeliveredMessages, deliveredMsgs)
+	}
+	if len(eventData.Data.SeenMessages) > 0 {
+		seenMsgs := make([]model.SeenMessage, 0, len(eventData.Data.SeenMessages))
+		for _, sm := range eventData.Data.SeenMessages {
+			seenObject := model.NewGroupSeenMessage(uid, sm)
+			if seenObject.IsSelf() && !ln.selfListen {
+				continue
+			}
+			seenMsgs = append(seenMsgs, seenObject)
+		}
+		emit(ctx, ln.ch.SeenMessages, seenMsgs)
+	}
+}
+
+func (ln *listener) handleReactions(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.ReactionEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleReaction", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	uid := ln.sc.UID()
+	for _, r := range eventData.Data.Reactions {
+		reaction := model.NewReaction(uid, r, model.ThreadTypeUser)
+		if reaction.IsSelf && !ln.selfListen {
+			continue
+		}
+		emit(ctx, ln.ch.Reaction, reaction)
+	}
+	for _, r := range eventData.Data.GroupReactions {
+		reaction := model.NewReaction(uid, r, model.ThreadTypeGroup)
+		if reaction.IsSelf && !ln.selfListen {
+			continue
+		}
+		emit(ctx, ln.ch.Reaction, reaction)
+	}
+}
+
+func (ln *listener) handleOldReactions(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.ReactionEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data", "listener.handleOldReactions", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	reactions := make([]model.Reaction, 0, len(eventData.Data.Reactions)+len(eventData.Data.GroupReactions))
+
+	threadType := model.ThreadTypeUser
+	selected := eventData.Data.Reactions
+	if len(eventData.Data.GroupReactions) > 0 {
+		threadType = model.ThreadTypeGroup
+		selected = eventData.Data.GroupReactions
+	}
+
+	uid := ln.sc.UID()
+	for _, r := range selected {
+		reactionObject := model.NewReaction(uid, r, threadType)
+		reactions = append(reactions, reactionObject)
+	}
+
+	emit(ctx, ln.ch.OldReactions, model.NewOldReactions(reactions, threadType))
+}
+
+func (ln *listener) handleActions(ctx context.Context, body BaseWSMessage) {
+	eventData, err := decodeEventData[events.ActionEventData](body, ln.cipherKey)
+	if err != nil {
+		err = errs.WrapZCA("Failed to decode event data:", "listener.handleActions", err)
+		ln.emitError(ctx, err)
+		return
+	}
+
+	for _, action := range eventData.Data.Actions {
+		switch action.ActionType {
+		case "typing":
+			// Always triggered by others; no self-check needed			switch action.Action {
+			switch action.Action {
+			case "typing":
+				typingObject := model.NewUserTyping(action.Data.Typing)
+				emit(ctx, ln.ch.Typing, model.Typing(typingObject))
+			case "gtyping":
+				typingObject := model.NewGroupTyping(action.Data.GroupTyping)
+				emit(ctx, ln.ch.Typing, model.Typing(typingObject))
+			}
 		}
 	}
 }
@@ -147,7 +327,39 @@ func (ln *listener) handleControls(ctx context.Context, body BaseWSMessage) {
 
 			emit(ctx, ln.ch.UploadAttachment, uploadObject)
 		case "group":
+			if content.Data.GroupEvent == nil {
+				continue
+			}
+
+			// 31/08/2024
+			// for some reason, Zalo send both join and join_reject event when admin approve join requests
+			// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
+			if content.Action == "join_reject" {
+				continue
+			}
+
+			groupEvent := model.NewGroupEvent(ln.sc.UID(), content.Action, content.Data.GroupEvent)
+			if groupEvent.IsSelf() && !ln.selfListen {
+				continue
+			}
+			emit(ctx, ln.ch.Group, groupEvent)
 		case "fr":
+			if content.Data.FriendEvent == nil {
+				continue
+			}
+
+			// 31/08/2024
+			// for some reason, Zalo send both join and join_reject event when admin approve join requests
+			// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
+			if content.Action == "req" {
+				continue
+			}
+
+			friendEvent := model.NewFriendEvent(ln.sc.UID(), content.Action, content.Data.FriendEvent)
+			if friendEvent.IsSelf() && !ln.selfListen {
+				continue
+			}
+			emit(ctx, ln.ch.Friend, friendEvent)
 		}
 	}
 }

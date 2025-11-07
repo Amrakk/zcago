@@ -46,7 +46,7 @@ func (ln *listener) SendWS(ctx context.Context, p WSPayload, requireID bool) err
 
 func (ln *listener) RequestOldMessages(ctx context.Context, tt model.ThreadType, lastMsgID *string) error {
 	cmd := uint16(510)
-	if tt == model.ThreadTypeUser {
+	if tt == model.ThreadTypeGroup {
 		cmd = 511
 	}
 	data := map[string]any{
@@ -65,7 +65,7 @@ func (ln *listener) RequestOldMessages(ctx context.Context, tt model.ThreadType,
 
 func (ln *listener) RequestOldReactions(ctx context.Context, tt model.ThreadType, lastMsgID *string) error {
 	cmd := uint16(610)
-	if tt == model.ThreadTypeUser {
+	if tt == model.ThreadTypeGroup {
 		cmd = 611
 	}
 	data := map[string]any{

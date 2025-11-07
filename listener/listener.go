@@ -32,16 +32,17 @@ type Listener interface {
 	Closed() <-chan websocketx.CloseInfo
 	Error() <-chan error
 	Message() <-chan model.Message
-	// OldMessage() <-chan OldMessages
-	// Reaction() <-chan Reaction
-	// OldReaction() <-chan OldReactions
-	// Typing() <-chan Typing
-	// DeliveredMessage() <-chan []DeliveredMessage
-	// SeenMessage() <-chan []SeenMessage
+	OldMessages() <-chan model.OldMessages
+	Reaction() <-chan model.Reaction
+	OldReactions() <-chan model.OldReactions
+	Typing() <-chan model.Typing
+	// Zalo may sent duplicate delivered messages, based on number of online devices of recipients
+	DeliveredMessages() <-chan []model.DeliveredMessage
+	SeenMessages() <-chan []model.SeenMessage
 	Undo() <-chan model.Undo
 	UploadAttachment() <-chan model.UploadAttachment
-	// Friend() <-chan Friend
-	// Group() <-chan Group
+	Friend() <-chan model.FriendEvent
+	Group() <-chan model.GroupEvent
 	CipherKey() <-chan string
 
 	SendWS(ctx context.Context, payload WSPayload, requireID bool) error
@@ -338,21 +339,21 @@ func buildRetryStates(sc session.MutableContext) map[string]*retryState {
 func initializeChannels() channels {
 	buf := defaultBuffers()
 	return channels{
-		Connected:    make(chan struct{}, buf.Connected),
-		Disconnected: make(chan websocketx.CloseInfo, buf.Disconnected),
-		Closed:       make(chan websocketx.CloseInfo, buf.Closed),
-		Error:        make(chan error, buf.Error),
-		Message:      make(chan model.Message, buf.Message),
-		// OldMessages: make(chan OldMessagesEvent, buf.OldMessages),
-		// Reaction: make(chan Reaction, buf.Reaction),
-		// OldReactions: make(chan OldReactionsEvent, buf.OldReactions),
-		// Typing: make(chan Typing, buf.Typing),
-		// DeliveredMessages: make(chan []DeliveredMessage, buf.DeliveredMessages),
-		// SeenMessages: make(chan []SeenMessage, buf.SeenMessages),
-		Undo:             make(chan model.Undo, buf.Undo),
-		UploadAttachment: make(chan model.UploadAttachment, buf.UploadAttachment),
-		// Friend: make(chan FriendEvent, buf.Friend),
-		// Group: make(chan GroupEvent, buf.Group),
-		CipherKey: make(chan string, buf.CipherKey),
+		Connected:         make(chan struct{}, buf.Connected),
+		Disconnected:      make(chan websocketx.CloseInfo, buf.Disconnected),
+		Closed:            make(chan websocketx.CloseInfo, buf.Closed),
+		Error:             make(chan error, buf.Error),
+		Message:           make(chan model.Message, buf.Message),
+		OldMessages:       make(chan model.OldMessages, buf.OldMessages),
+		Reaction:          make(chan model.Reaction, buf.Reaction),
+		OldReactions:      make(chan model.OldReactions, buf.OldReactions),
+		Typing:            make(chan model.Typing, buf.Typing),
+		DeliveredMessages: make(chan []model.DeliveredMessage, buf.DeliveredMessages),
+		SeenMessages:      make(chan []model.SeenMessage, buf.SeenMessages),
+		Undo:              make(chan model.Undo, buf.Undo),
+		UploadAttachment:  make(chan model.UploadAttachment, buf.UploadAttachment),
+		Friend:            make(chan model.FriendEvent, buf.Friend),
+		Group:             make(chan model.GroupEvent, buf.Group),
+		CipherKey:         make(chan string, buf.CipherKey),
 	}
 }

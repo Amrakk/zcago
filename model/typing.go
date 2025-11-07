@@ -1,60 +1,55 @@
 package model
 
-import "encoding/json"
+type Typing interface {
+	Type() ThreadType
+	ThreadID() string
+	IsSelf() bool
+}
 
 type UserTyping struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TTyping
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewUserTyping(data TTyping) UserTyping {
 	return UserTyping{
-		Type:     ThreadTypeUser,
+		typ:      ThreadTypeUser,
 		Data:     data,
-		ThreadID: data.UID,
-		IsSelf:   false,
+		threadID: data.UID,
+		isSelf:   false,
 	}
 }
 
+func (t UserTyping) Type() ThreadType { return t.typ }
+func (t UserTyping) ThreadID() string { return t.threadID }
+func (t UserTyping) IsSelf() bool     { return t.isSelf }
+
 type GroupTyping struct {
-	Type     ThreadType
+	typ      ThreadType
 	Data     TGroupTyping
-	ThreadID string
-	IsSelf   bool
+	threadID string
+	isSelf   bool
 }
 
 func NewGroupTyping(data TGroupTyping) GroupTyping {
 	return GroupTyping{
-		Type:     ThreadTypeGroup,
+		typ:      ThreadTypeGroup,
 		Data:     data,
-		ThreadID: data.GID,
-		IsSelf:   false,
+		threadID: data.GID,
+		isSelf:   false,
 	}
 }
+
+func (t GroupTyping) Type() ThreadType { return t.typ }
+func (t GroupTyping) ThreadID() string { return t.threadID }
+func (t GroupTyping) IsSelf() bool     { return t.isSelf }
 
 type TTyping struct {
 	UID  string `json:"uid"`
 	TS   string `json:"ts"`
-	IsPC bool   `json:"isPC"`
-}
-
-func (t *TTyping) UnmarshalJSON(data []byte) error {
-	type Alias TTyping
-	aux := &struct {
-		IsPC int `json:"isPC"`
-		*Alias
-	}{
-		Alias: (*Alias)(t),
-	}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	t.IsPC = aux.IsPC != 0
-	return nil
+	IsPC uint8  `json:"isPC"`
 }
 
 type TGroupTyping struct {

@@ -55,6 +55,10 @@ loginQR: ## Run login-QR dev app (cmd/dev-login-qr)
 	$(GOCMD) run ./cmd/dev-login-qr
 .PHONY: loginQR
 
+listener: ## Run listener dev app (cmd/dev-listener)
+	$(GOCMD) run ./cmd/dev-listener
+.PHONY: listener
+
 gen-endpoint: ## Generate endpoint skeleton (usage: make gen-endpoint NAME=SendMessage)
 	$(GOCMD) run ./cmd/gen-endpoint -name=$(NAME)
 .PHONY: gen-endpoint
