@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	version  = "v0.2.0"
+	version  = "v0.2.1"
 	registry = "https://proxy.golang.org/github.com/amrakk/zcago/@latest"
 )
 
