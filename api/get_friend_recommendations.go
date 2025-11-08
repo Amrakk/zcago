@@ -11,6 +11,13 @@ import (
 	"github.com/Amrakk/zcago/session"
 )
 
+type FriendRecType int
+
+const (
+	FriendRecRecommended FriendRecType = iota + 1
+	FriendRecRequest                   // received friend request
+)
+
 type (
 	CollapseConfig struct {
 		CollapseID    int `json:"collapseId"`
@@ -33,7 +40,7 @@ type (
 		Gender          model.Gender           `json:"gender"`
 		Dob             int64                  `json:"dob"`
 		Type            int                    `json:"type"`
-		RecommType      int                    `json:"recommType"`
+		RecommType      FriendRecType          `json:"recommType"`
 		RecommSrc       int                    `json:"recommSrc"`
 		RecommTime      int64                  `json:"recommTime"`
 		RecommInfo      RecommendationMeta     `json:"recommInfo"`
