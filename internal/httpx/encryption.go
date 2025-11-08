@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/big"
 	"strings"
 	"time"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/internal/cryptox"
 	"github.com/Amrakk/zcago/session"
 )
@@ -52,7 +54,7 @@ type paramsEncryptor struct {
 func NewParamsEncryptor(apiType uint, imei string, firstLaunchTime int64) (ParamsEncryptor, error) {
 	p := Params{
 		ZCID:          "",
-		EncryptVer:    "v2",
+		EncryptVer:    config.DefaultEncryptVersion,
 		ZCIDExtension: randomString(nil, nil),
 	}
 
@@ -90,7 +92,7 @@ func (pe *paramsEncryptor) createZCID(apiType uint, imei string, firstLaunchTime
 		return fmt.Errorf("invalid params")
 	}
 
-	key := "3FC4F0D2AB50057BCE0D90D9187A22B1"
+	key := config.DefaultZCIDKey
 	data := fmt.Sprintf("%d,%s,%d", apiType, imei, firstLaunchTime)
 	encType := cryptox.EncryptTypeHex
 
@@ -196,7 +198,7 @@ func randomString(min, max *int) string {
 // GetEncryptParam generates encrypted parameters for Zalo API requests
 func GetEncryptParam(sc session.Context, encryptParams bool, typeStr string) (*EncryptParamResult, error) {
 	data := map[string]any{
-		"computer_name": "Web",
+		"computer_name": config.DefaultComputerName,
 		"imei":          sc.IMEI(),
 		"language":      sc.Language(),
 		"ts":            time.Now().UnixMilli(),
@@ -213,13 +215,9 @@ func GetEncryptParam(sc session.Context, encryptParams bool, typeStr string) (*E
 
 	params := make(map[string]any, 8)
 	if enc == nil {
-		for k, v := range data {
-			params[k] = v
-		}
+		maps.Copy(params, data)
 	} else {
-		for k, v := range enc.EncryptedParams.ToMap() {
-			params[k] = v
-		}
+		maps.Copy(params, enc.EncryptedParams.ToMap())
 		params["params"] = enc.EncryptedData
 	}
 
@@ -230,7 +228,7 @@ func GetEncryptParam(sc session.Context, encryptParams bool, typeStr string) (*E
 			"imei":           sc.IMEI(),
 			"type":           sc.APIType(),
 			"client_version": sc.APIVersion(),
-			"computer_name":  "Web",
+			"computer_name":  config.DefaultComputerName,
 		})
 	} else {
 		params["signkey"] = GenerateZaloSignKey(typeStr, params)

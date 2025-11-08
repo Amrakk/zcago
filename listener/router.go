@@ -15,8 +15,6 @@ import (
 func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body BaseWSMessage) {
 	key := fmt.Sprintf("%d_%d_%d", version, cmd, sub)
 
-	fmt.Println(key)
-
 	switch key {
 	case "1_1_1":
 		ln.handleCipherKey(ctx, body)

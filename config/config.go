@@ -16,7 +16,11 @@ const (
 	DefaultQRPath  = "qr.png"
 	DefaultUIDSelf = "0"
 
+	DefaultEncryptVersion = "v2"
+	DefaultZCIDKey        = "3FC4F0D2AB50057BCE0D90D9187A22B1"
+
 	MaxMessagesPerRequest = 50
+	MaxRedirects          = 10
 )
 
 var DefaultURL = url.URL{Scheme: "https", Host: "chat.zalo.me"}

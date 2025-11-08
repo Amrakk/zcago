@@ -137,7 +137,7 @@ func buildChunks(fieldName, contentType, fileName string, src io.Reader, chunkSi
 func buildRequest(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Request, error) {
 	headers := http.Header{}
 
-	method := "GET"
+	method := http.MethodGet
 	if opt != nil && opt.Method != "" {
 		method = opt.Method
 	}

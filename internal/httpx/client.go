@@ -7,12 +7,11 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Amrakk/zcago/config"
 	"github.com/Amrakk/zcago/internal/cryptox"
 	"github.com/Amrakk/zcago/internal/logger"
 	"github.com/Amrakk/zcago/session"
 )
-
-const maxRedirects = 10
 
 func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Response, error) {
 	return requestWithRedirect(ctx, sc, urlStr, opt, 0)
@@ -23,10 +22,10 @@ func HandleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 }
 
 func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions, depth int) (*http.Response, error) {
-	if depth > maxRedirects {
+	if depth > config.MaxRedirects {
 		logger.Log(sc).
 			Warn("Too many redirects, aborting request").
-			Debug("Max redirects exceeded:", maxRedirects)
+			Debug("Max redirects exceeded:", config.MaxRedirects)
 		return nil, fmt.Errorf("too many redirects")
 	}
 
