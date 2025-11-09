@@ -22,6 +22,8 @@ const (
 	ZaloKickConnection      int = 3003
 )
 
+type CloseInfo = websocketx.CloseInfo
+
 type Listener interface {
 	Start(ctx context.Context, retryOnClose bool) error
 	Stop()

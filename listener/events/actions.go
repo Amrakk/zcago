@@ -33,7 +33,7 @@ func (m *actionData) UnmarshalJSON(data []byte) error {
 			s = "{" + s
 		}
 		if !strings.HasSuffix(s, "}") {
-			s = s + "}"
+			s += "}"
 		}
 
 		data = []byte(s)

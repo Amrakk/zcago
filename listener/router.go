@@ -206,7 +206,6 @@ func (ln *listener) handleGroupMessagesStatus(ctx context.Context, body BaseWSMe
 				continue
 			}
 			deliveredMsgs = append(deliveredMsgs, deliveredObject)
-
 		}
 		emit(ctx, ln.ch.DeliveredMessages, deliveredMsgs)
 	}
@@ -294,6 +293,8 @@ func (ln *listener) handleActions(ctx context.Context, body BaseWSMessage) {
 				typingObject := model.NewGroupTyping(action.Data.GroupTyping)
 				emit(ctx, ln.ch.Typing, model.Typing(typingObject))
 			}
+		default:
+			continue
 		}
 	}
 }
@@ -308,58 +309,70 @@ func (ln *listener) handleControls(ctx context.Context, body BaseWSMessage) {
 
 	for _, ctrl := range eventData.Data.Controls {
 		content := ctrl.Content
+
 		switch content.ActionType {
 		case "file_done":
-			if content.FileID == nil || content.Data.UploadAttachment == nil {
-				continue
-			}
-
-			fileID, url := *content.FileID, content.Data.UploadAttachment.URL
-			uploadObject := model.NewUploadAttachment(strconv.FormatInt(fileID, 10), url)
-
-			uploadCallback, ok := ln.sc.UploadCallback().Get(strconv.FormatInt(fileID, 10))
-			if ok {
-				go uploadCallback(uploadObject)
-				ln.sc.UploadCallback().Delete(strconv.FormatInt(fileID, 10))
-			}
-
-			emit(ctx, ln.ch.UploadAttachment, uploadObject)
+			ln.handleFileDone(ctx, content)
 		case "group":
-			if content.Data.GroupEvent == nil {
-				continue
-			}
-
-			// 31/08/2024
-			// for some reason, Zalo send both join and join_reject event when admin approve join requests
-			// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
-			if content.Action == "join_reject" {
-				continue
-			}
-
-			groupEvent := model.NewGroupEvent(ln.sc.UID(), content.Action, content.Data.GroupEvent)
-			if groupEvent.IsSelf() && !ln.selfListen {
-				continue
-			}
-			emit(ctx, ln.ch.Group, groupEvent)
+			ln.handleGroupEvent(ctx, content)
 		case "fr":
-			if content.Data.FriendEvent == nil {
-				continue
-			}
-
-			// 31/08/2024
-			// for some reason, Zalo send both join and join_reject event when admin approve join requests
-			// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
-			if content.Action == "req" {
-				continue
-			}
-
-			friendEvent := model.NewFriendEvent(ln.sc.UID(), content.Action, content.Data.FriendEvent)
-			if friendEvent.IsSelf() && !ln.selfListen {
-				continue
-			}
-			emit(ctx, ln.ch.Friend, friendEvent)
+			ln.handleFriendEvent(ctx, content)
 		}
 	}
+}
+
+func (ln *listener) handleFileDone(ctx context.Context, content events.ControlContent) {
+	if content.FileID == nil || content.Data.UploadAttachment == nil {
+		return
+	}
+
+	idStr := strconv.FormatInt(*content.FileID, 10)
+	url := content.Data.UploadAttachment.URL
+	uploadObject := model.NewUploadAttachment(idStr, url)
+
+	if cb, ok := ln.sc.UploadCallback().Get(idStr); ok {
+		go cb(uploadObject)
+		ln.sc.UploadCallback().Delete(idStr)
+	}
+	emit(ctx, ln.ch.UploadAttachment, uploadObject)
+}
+
+func (ln *listener) handleGroupEvent(ctx context.Context, content events.ControlContent) {
+	if content.Data.GroupEvent == nil {
+		return
+	}
+
+	// 31/08/2024
+	// For some reason, Zalo send both join and join_reject event when admin approve join requests
+	// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
+	if content.Action == "join_reject" {
+		return
+	}
+
+	ev := model.NewGroupEvent(ln.sc.UID(), content.Action, content.Data.GroupEvent)
+	if ev.IsSelf() && !ln.selfListen {
+		return
+	}
+	emit(ctx, ln.ch.Group, ev)
+}
+
+func (ln *listener) handleFriendEvent(ctx context.Context, content events.ControlContent) {
+	if content.Data.FriendEvent == nil {
+		return
+	}
+
+	// 31/08/2024
+	// For some reason, Zalo send both join and join_reject event when admin approve join requests
+	// Zalo itself doesn't seem to handle this properly either, so we gonna ignore the join_reject event
+	if content.Action == "req" {
+		return
+	}
+
+	ev := model.NewFriendEvent(ln.sc.UID(), content.Action, content.Data.FriendEvent)
+	if ev.IsSelf() && !ln.selfListen {
+		return
+	}
+	emit(ctx, ln.ch.Friend, ev)
 }
 
 func (ln *listener) handleDuplicateConnection() {

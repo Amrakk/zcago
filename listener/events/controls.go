@@ -7,14 +7,14 @@ import (
 )
 
 type ControlEventData struct {
-	Controls []controlItem `json:"controls"`
+	Controls []ControlItem `json:"controls"`
 }
 
-type controlItem struct {
-	Content controlContent `json:"content"`
+type ControlItem struct {
+	Content ControlContent `json:"content"`
 }
 
-type controlContent struct {
+type ControlContent struct {
 	ActionType string      `json:"act_type"`
 	Action     string      `json:"act"`
 	Data       controlData `json:"data"`
@@ -44,7 +44,7 @@ func (d *ControlEventData) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (c *controlContent) UnmarshalJSON(data []byte) error {
+func (c *ControlContent) UnmarshalJSON(data []byte) error {
 	var raw struct {
 		ActionType string          `json:"act_type"`
 		Action     string          `json:"act"`

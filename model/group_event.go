@@ -40,52 +40,38 @@ const (
 	GroupEventTypeUnknown GroupEventType = "unknown"
 )
 
+var groupEventType = map[string]GroupEventType{
+	"join_request":      GroupEventTypeJoinRequest,
+	"join":              GroupEventTypeJoin,
+	"leave":             GroupEventTypeLeave,
+	"remove_member":     GroupEventTypeRemoveMember,
+	"block_member":      GroupEventTypeBlockMember,
+	"update_setting":    GroupEventTypeUpdateSetting,
+	"update":            GroupEventTypeUpdate,
+	"new_link":          GroupEventTypeNewLink,
+	"add_admin":         GroupEventTypeAddAdmin,
+	"remove_admin":      GroupEventTypeRemoveAdmin,
+	"new_pin_topic":     GroupEventTypeNewPinTopic,
+	"update_pin_topic":  GroupEventTypeUpdatePinTopic,
+	"reorder_pin_topic": GroupEventTypeReorderPinTopic,
+	"update_board":      GroupEventTypeUpdateBoard,
+	"remove_board":      GroupEventTypeRemoveBoard,
+	"update_topic":      GroupEventTypeUpdateTopic,
+	"unpin_topic":       GroupEventTypeUnpinTopic,
+	"remove_topic":      GroupEventTypeRemoveTopic,
+	"accept_remind":     GroupEventTypeAcceptRemind,
+	"reject_remind":     GroupEventTypeRejectRemind,
+	"remind_topic":      GroupEventTypeRemindTopic,
+	"update_avatar":     GroupEventTypeUpdateAvatar,
+}
+
 func ParseGroupEventType(s string) GroupEventType {
-	switch s {
-	case "join_request":
-		return GroupEventTypeJoinRequest
-	case "join":
-		return GroupEventTypeJoin
-	case "leave":
-		return GroupEventTypeLeave
-	case "remove_member":
-		return GroupEventTypeRemoveMember
-	case "block_member":
-		return GroupEventTypeBlockMember
-	case "update_setting":
-		return GroupEventTypeUpdateSetting
-	case "update":
-		return GroupEventTypeUpdate
-	case "new_link":
-		return GroupEventTypeNewLink
-	case "add_admin":
-		return GroupEventTypeAddAdmin
-	case "remove_admin":
-		return GroupEventTypeRemoveAdmin
-	case "new_pin_topic":
-		return GroupEventTypeNewPinTopic
-	case "update_pin_topic":
-		return GroupEventTypeUpdatePinTopic
-	case "reorder_pin_topic":
-		return GroupEventTypeReorderPinTopic
-	case "update_board":
-		return GroupEventTypeUpdateBoard
-	case "remove_board":
-		return GroupEventTypeRemoveBoard
-	case "update_topic":
-		return GroupEventTypeUpdateTopic
-	case "unpin_topic":
-		return GroupEventTypeUnpinTopic
-	case "remove_topic":
-		return GroupEventTypeRemoveTopic
-	case "accept_remind":
-		return GroupEventTypeAcceptRemind
-	case "reject_remind":
-		return GroupEventTypeRejectRemind
-	case "remind_topic":
-		return GroupEventTypeRemindTopic
-	case "update_avatar":
-		return GroupEventTypeUpdateAvatar
+	if s == "" {
+		return GroupEventTypeUnknown
+	}
+	switch t, ok := groupEventType[s]; {
+	case ok:
+		return t
 	default:
 		return GroupEventTypeUnknown
 	}

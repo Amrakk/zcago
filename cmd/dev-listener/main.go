@@ -83,235 +83,91 @@ func (a *ListenerApp) run() error {
 	return nil
 }
 
+func spawn[T any](a *ListenerApp, name string, ch <-chan T, handle func(T)) {
+	a.wg.Add(1)
+	go func() {
+		defer a.wg.Done()
+		for {
+			select {
+			case <-a.ctx.Done():
+				fmt.Printf("%s listener: context cancelled\n", name)
+				return
+			case v, ok := <-ch:
+				if !ok {
+					fmt.Printf("%s listener: channel closed\n", name)
+					return
+				}
+				handle(v)
+			}
+		}
+	}()
+}
+
 func (a *ListenerApp) startChannelListeners(ln listener.Listener) {
-	// Connected channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Connected listener: context cancelled")
-				return
-			case <-ln.Connected():
-				fmt.Println("🟢 WebSocket Connected")
-			}
-		}
-	}()
+	// Note the prefix: spawn(a, ...)
+	spawn(a, "Connected", ln.Connected(), func(_ struct{}) {
+		fmt.Println("🟢 WebSocket Connected")
+	})
 
-	// Disconnected channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Disconnected listener: context cancelled")
-				return
-			case closeInfo := <-ln.Disconnected():
-				fmt.Printf("🟡 WebSocket Disconnected - Code: %d, Reason: %s, Error: %v\n",
-					closeInfo.Code, closeInfo.Reason, closeInfo.Err)
-			}
-		}
-	}()
+	spawn(a, "Disconnected", ln.Disconnected(), func(ci listener.CloseInfo) {
+		fmt.Printf("🟡 WebSocket Disconnected - Code: %d, Reason: %s, Error: %v\n",
+			ci.Code, ci.Reason, ci.Err)
+	})
 
-	// Closed channel listener - this will trigger shutdown
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Closed listener: context cancelled")
-				return
-			case closeInfo := <-ln.Closed():
-				fmt.Printf("🔴 WebSocket Closed - Code: %d, Reason: %s, Error: %v\n",
-					closeInfo.Code, closeInfo.Reason, closeInfo.Err)
-				fmt.Println("Connection closed, stopping listener...")
-				// a.cancel() // Trigger shutdown
-				// return
-			}
-		}
-	}()
+	spawn(a, "Closed", ln.Closed(), func(ci listener.CloseInfo) {
+		fmt.Printf("🔴 WebSocket Closed - Code: %d, Reason: %s, Error: %v\n",
+			ci.Code, ci.Reason, ci.Err)
+		fmt.Println("Connection closed, stopping listener...")
+		// a.cancel() // Uncomment to trigger shutdown
+	})
 
-	// Error channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Error listener: context cancelled")
-				return
-			case err := <-ln.Error():
-				fmt.Printf("❌ WebSocket Error: %v\n", err)
-			}
-		}
-	}()
+	spawn(a, "Error", ln.Error(), func(err error) {
+		fmt.Printf("❌ WebSocket Error: %v\n", err)
+	})
 
-	// Message channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Message listener: context cancelled")
-				return
-			case msg := <-ln.Message():
-				a.handleMessage(msg)
-			}
-		}
-	}()
+	spawn(a, "Message", ln.Message(), func(m model.Message) {
+		a.handleMessage(m)
+	})
 
-	// Old Message channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Old Message listener: context cancelled")
-				return
-			case msg := <-ln.OldMessages():
-				a.handleOldMessages(msg)
-			}
-		}
-	}()
+	spawn(a, "Old Message", ln.OldMessages(), func(m model.OldMessages) {
+		a.handleOldMessages(m)
+	})
 
-	// Reaction channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Reaction listener: context cancelled")
-				return
-			case reaction := <-ln.Reaction():
-				a.handleReaction(reaction)
-			}
-		}
-	}()
+	spawn(a, "Reaction", ln.Reaction(), func(r model.Reaction) {
+		a.handleReaction(r)
+	})
 
-	// Old Reaction channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Old Reaction listener: context cancelled")
-				return
-			case reaction := <-ln.OldReactions():
-				a.handleOldReactions(reaction)
-			}
-		}
-	}()
+	spawn(a, "Old Reaction", ln.OldReactions(), func(r model.OldReactions) {
+		a.handleOldReactions(r)
+	})
 
-	// Typing channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Typing listener: context cancelled")
-				return
-			case typing := <-ln.Typing():
-				a.handleTyping(typing)
-			}
-		}
-	}()
+	spawn(a, "Typing", ln.Typing(), func(t model.Typing) {
+		a.handleTyping(t)
+	})
 
-	// Delivered Message channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Delivered Message listener: context cancelled")
-				return
-			case delivered := <-ln.DeliveredMessages():
-				a.handleDeliveredMessages(delivered)
-			}
-		}
-	}()
+	spawn(a, "Delivered Message", ln.DeliveredMessages(), func(d []model.DeliveredMessage) {
+		a.handleDeliveredMessages(d)
+	})
 
-	// Seen Message channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Seen Message listener: context cancelled")
-				return
-			case seen := <-ln.SeenMessages():
-				a.handleSeenMessages(seen)
-			}
-		}
-	}()
+	spawn(a, "Seen Message", ln.SeenMessages(), func(s []model.SeenMessage) {
+		a.handleSeenMessages(s)
+	})
 
-	// Undo channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Undo listener: context cancelled")
-				return
-			case undo := <-ln.Undo():
-				a.handleUndo(undo)
-			}
-		}
-	}()
+	spawn(a, "Undo", ln.Undo(), func(u model.Undo) {
+		a.handleUndo(u)
+	})
 
-	// Group channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Group listener: context cancelled")
-				return
-			case group := <-ln.Group():
-				a.handleGroup(group)
-			}
-		}
-	}()
+	spawn(a, "Group", ln.Group(), func(g model.GroupEvent) {
+		a.handleGroup(g)
+	})
 
-	// Friend channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("Friend listener: context cancelled")
-				return
-			case friend := <-ln.Friend():
-				a.handleFriend(friend)
-			}
-		}
-	}()
-	// CipherKey channel listener
-	a.wg.Add(1)
-	go func() {
-		defer a.wg.Done()
-		for {
-			select {
-			case <-a.ctx.Done():
-				fmt.Println("CipherKey listener: context cancelled")
-				return
-			case key := <-ln.CipherKey():
-				fmt.Printf("🔑 New Cipher Key received: %s\n", key)
-			}
-		}
-	}()
+	spawn(a, "Friend", ln.Friend(), func(f model.FriendEvent) {
+		a.handleFriend(f)
+	})
+
+	spawn(a, "CipherKey", ln.CipherKey(), func(key string) {
+		fmt.Printf("🔑 New Cipher Key received: %s\n", key)
+	})
 
 	fmt.Println("All channel listeners started")
 }

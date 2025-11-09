@@ -14,21 +14,23 @@ func (a *ListenerApp) handleMessage(msg model.Message) {
 	var content, displayName string
 	switch m := msg.(type) {
 	case model.UserMessage:
-		if m.Data.Content.String != nil {
+		switch {
+		case m.Data.Content.String != nil:
 			content = *m.Data.Content.String
-		} else if m.Data.Content.Attachment != nil {
+		case m.Data.Content.Attachment != nil:
 			content = fmt.Sprintf("[Attachment: %s]", m.Data.Content.Attachment.Title)
-		} else {
+		default:
 			content = "[Other content type]"
 		}
 		displayName = m.Data.DName
 
 	case model.GroupMessage:
-		if m.Data.Content.String != nil {
+		switch {
+		case m.Data.Content.String != nil:
 			content = *m.Data.Content.String
-		} else if m.Data.Content.Attachment != nil {
+		case m.Data.Content.Attachment != nil:
 			content = fmt.Sprintf("[Attachment: %s]", m.Data.Content.Attachment.Title)
-		} else {
+		default:
 			content = "[Other content type]"
 		}
 		displayName = m.Data.DName
@@ -86,7 +88,6 @@ func (a *ListenerApp) handleOldMessages(oldMessages model.OldMessages) {
 		fmt.Printf("🕰️ [%s] Old Message%s in %s - MsgID: %s, CliMsgID: %s: %s\n",
 			timestamp, selfIndicator, om.ThreadID(),
 			msgID, cliMsgID, content)
-
 	}
 
 	if a.isDebug {
@@ -282,28 +283,6 @@ func (a *ListenerApp) handleGroup(ev model.GroupEvent) {
 	threadID := ev.ThreadID()
 	data := ev.Data()
 
-	category := "Unknown"
-	switch eventType {
-	case model.GroupEventTypeJoinRequest:
-		category = "Join Request"
-	case model.GroupEventTypeJoin:
-		category = "Member Joined"
-	case model.GroupEventTypeLeave, model.GroupEventTypeRemoveMember, model.GroupEventTypeBlockMember:
-		category = "Member Left/Removed"
-	case model.GroupEventTypeNewPinTopic, model.GroupEventTypeUpdatePinTopic, model.GroupEventTypeUnpinTopic:
-		category = "Pinned Topic"
-	case model.GroupEventTypeReorderPinTopic:
-		category = "Reorder Pinned Topics"
-	case model.GroupEventTypeUpdateBoard, model.GroupEventTypeRemoveBoard:
-		category = "Board Update"
-	case model.GroupEventTypeAcceptRemind, model.GroupEventTypeRejectRemind:
-		category = "Reminder Response"
-	case model.GroupEventTypeRemindTopic:
-		category = "Reminder Topic"
-	case model.GroupEventTypeUpdateAvatar:
-		category = "Avatar Update"
-	}
-
 	detail := ""
 	switch v := data.(type) {
 	case model.TGroupEventJoinRequest:
@@ -332,11 +311,11 @@ func (a *ListenerApp) handleGroup(ev model.GroupEvent) {
 	}
 
 	if detail != "" {
-		fmt.Printf("👥 [%s] Group Event%s - Category: %s, Type: %s, ThreadID: %s, Action: %s | %s\n",
-			timestamp, selfIndicator, category, eventType, threadID, action, detail)
+		fmt.Printf("👥 [%s] Group Event%s - Type: %s, ThreadID: %s, Action: %s | %s\n",
+			timestamp, selfIndicator, eventType, threadID, action, detail)
 	} else {
-		fmt.Printf("👥 [%s] Group Event%s - Category: %s, Type: %s, ThreadID: %s, Action: %s\n",
-			timestamp, selfIndicator, category, eventType, threadID, action)
+		fmt.Printf("👥 [%s] Group Event%s - Type: %s, ThreadID: %s, Action: %s\n",
+			timestamp, selfIndicator, eventType, threadID, action)
 	}
 
 	if a.isDebug {
@@ -358,34 +337,6 @@ func (a *ListenerApp) handleFriend(ev model.FriendEvent) {
 	action := ev.Action()
 	threadID := ev.ThreadID()
 	data := ev.Data()
-
-	category := "Unknown"
-	switch eventType {
-	case model.FriendEventTypeAdd:
-		category = "Friend Added"
-	case model.FriendEventTypeRemove:
-		category = "Friend Removed"
-	case model.FriendEventTypeRequest:
-		category = "Friend Request"
-	case model.FriendEventTypeUndoRequest:
-		category = "Friend Request Undone"
-	case model.FriendEventTypeSeenFriendRequest:
-		category = "Friend Request Seen"
-	case model.FriendEventTypeRejectRequest:
-		category = "Friend Request Rejected"
-	case model.FriendEventTypeBlock:
-		category = "Friend Blocked"
-	case model.FriendEventTypeUnblock:
-		category = "Friend Unblocked"
-	case model.FriendEventTypeBlockCall:
-		category = "Friend Call Blocked"
-	case model.FriendEventTypeUnblockCall:
-		category = "Friend Call Unblocked"
-	case model.FriendEventTypePinCreate:
-		category = "Friend Pinned"
-	case model.FriendEventTypePinUnpin:
-		category = "Friend Unpinned"
-	}
 
 	detail := ""
 	switch v := data.(type) {
@@ -412,11 +363,11 @@ func (a *ListenerApp) handleFriend(ev model.FriendEvent) {
 	}
 
 	if detail != "" {
-		fmt.Printf("👤 [%s] Friend Event%s - Category: %s, Type: %s, ThreadID: %s, Action: %s | %s\n",
-			timestamp, selfIndicator, category, eventType, threadID, action, detail)
+		fmt.Printf("👤 [%s] Friend Event%s - Type: %s, ThreadID: %s, Action: %s | %s\n",
+			timestamp, selfIndicator, eventType, threadID, action, detail)
 	} else {
-		fmt.Printf("👤 [%s] Friend Event%s - Category: %s, Type: %s, ThreadID: %s, Action: %s\n",
-			timestamp, selfIndicator, category, eventType, threadID, action)
+		fmt.Printf("👤 [%s] Friend Event%s - Type: %s, ThreadID: %s, Action: %s\n",
+			timestamp, selfIndicator, eventType, threadID, action)
 	}
 
 	if a.isDebug {
