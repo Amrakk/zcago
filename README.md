@@ -37,7 +37,11 @@ See [API Documentation](https://tdung.gitbook.io/zca-js) for more details.
 ### Login
 
 ```go
-import "github.com/amrakk/zcago"
+import (
+	"context"
+
+	"github.com/amrakk/zcago"
+)
 
 cred := &zcago.Credentials{
     IMEI: "imei"
@@ -45,7 +49,7 @@ cred := &zcago.Credentials{
     UserAgent: "user-agent"
 }
 zalo := zcago.NewZalo()
-api, err := zalo.Login(cred)
+api, err := zalo.Login(context.Background(), cred)
 ```
 
 ### Listen for new messages
