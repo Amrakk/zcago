@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Amrakk/zcago"
+	"github.com/amrakk/zcago"
 )
 
 func (a *App) authenticate(ctx context.Context) (zcago.API, error) {

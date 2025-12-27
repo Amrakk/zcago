@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/listener/events"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/listener/events"
+	"github.com/amrakk/zcago/model"
 )
 
 func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body BaseWSMessage) {

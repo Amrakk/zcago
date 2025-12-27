@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/errs"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/errs"
 )
 
 type FileType string

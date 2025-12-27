@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/internal/cryptox"
+	"github.com/amrakk/zcago/session"
 )
 
 type EncryptedPayload struct {

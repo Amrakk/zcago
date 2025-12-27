@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Amrakk/zcago/errs"
+	"github.com/amrakk/zcago/errs"
 )
 
 // Credentials represents authentication data needed for Zalo login.

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 type ActionEventData struct {

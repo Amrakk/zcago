@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/Amrakk/zcago"
-	"github.com/Amrakk/zcago/session/auth"
+	"github.com/amrakk/zcago"
+	"github.com/amrakk/zcago/session/auth"
 )
 
 func main() {

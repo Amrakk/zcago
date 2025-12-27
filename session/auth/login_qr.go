@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/httpx"
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/internal/timex"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/httpx"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/internal/timex"
+	"github.com/amrakk/zcago/session"
 )
 
 type LoginQRResult struct {

@@ -7,8 +7,8 @@ import (
 
 	"golang.org/x/mod/semver"
 
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/session"
 )
 
 const (

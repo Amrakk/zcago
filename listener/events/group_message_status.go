@@ -1,6 +1,6 @@
 package events
 
-import "github.com/Amrakk/zcago/model"
+import "github.com/amrakk/zcago/model"
 
 type GroupMessageStatusEventData struct {
 	DeliveredMessages []model.TGroupDeliveredMessage `json:"delivereds"`

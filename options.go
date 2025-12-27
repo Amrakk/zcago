@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Amrakk/zcago/session"
-	"github.com/Amrakk/zcago/session/auth"
+	"github.com/amrakk/zcago/session"
+	"github.com/amrakk/zcago/session/auth"
 )
 
 type (

@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/Amrakk/zcago/internal/httpx"
-	"github.com/Amrakk/zcago/internal/jsonx"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/internal/httpx"
+	"github.com/amrakk/zcago/internal/jsonx"
+	"github.com/amrakk/zcago/session"
 )
 
 type (

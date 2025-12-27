@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/websocketx"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/websocketx"
+	"github.com/amrakk/zcago/model"
 )
 
 // ----------------------------------------

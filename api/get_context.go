@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/session"
 )
 
 func (a *api) GetContext() (session.Context, error) {

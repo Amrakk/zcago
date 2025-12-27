@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Amrakk/zcago"
-	API "github.com/Amrakk/zcago/api"
+	"github.com/amrakk/zcago"
+	API "github.com/amrakk/zcago/api"
 )
 
 type App struct {

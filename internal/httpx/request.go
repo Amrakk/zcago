@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/session"
 )
 
 type RequestOptions struct {

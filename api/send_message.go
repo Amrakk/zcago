@@ -7,15 +7,17 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/httpx"
-	"github.com/Amrakk/zcago/internal/jsonx"
-	"github.com/Amrakk/zcago/model"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/httpx"
+	"github.com/amrakk/zcago/internal/jsonx"
+	"github.com/amrakk/zcago/model"
+	"github.com/amrakk/zcago/session"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -175,10 +177,6 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 		}
 
 		handleMessage := func(threadID string, threadType model.ThreadType, message MessageContent) (*sendData, error) {
-			if len(message.Msg) == 0 {
-				return nil, ErrMessageContentEmpty
-			}
-
 			quote := message.Quote
 			isGroup := threadType == model.ThreadTypeGroup
 			if message.Quote != nil {
@@ -241,8 +239,10 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 			}, nil
 		}
 
-		// handleAttachment := func(threadID string, threadType model.ThreadType, message MessageContent) ([]sendData, error) {
-		// }
+		handleAttachment := func(threadID string, threadType model.ThreadType, message MessageContent) ([]sendData, error) {
+			// isGroup := threadType == model.ThreadTypeGroup
+			panic("not implemented")
+		}
 
 		sendMessage := func(ctx context.Context, sendData []sendData) ([]SendMessageResult, error) {
 			var (
@@ -290,23 +290,55 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 				return nil, errs.ErrExceedMaxFile
 			}
 
+			hasText := func() bool { return len(message.Msg) > 0 }
+			hasAttachments := func() bool { return len(message.Attachments) > 0 }
+
 			results := &SendMessageResponse{}
 
-			if len(message.Msg) > 0 {
+			sendText := func() error {
 				data, err := handleMessage(threadID, threadType, message)
 				if err != nil {
-					return nil, err
+					return err
 				}
-
 				resps, err := sendMessage(ctx, []sendData{*data})
 				if err != nil {
-					return nil, err
+					return err
 				}
-
 				if len(resps) > 0 {
 					results.Message = &resps[0]
-				} else {
-					panic("expected at least one message response")
+				}
+				return nil
+			}
+
+			sendAttachments := func() error {
+				data, err := handleAttachment(threadID, threadType, message)
+				if err != nil {
+					return err
+				}
+				resps, err := sendMessage(ctx, data)
+				if err != nil {
+					return err
+				}
+				results.Attachment = resps
+				return nil
+			}
+
+			if hasAttachments() && hasText() && (!message.IsPhotoDescription() || message.Quote != nil) {
+				if err := sendText(); err != nil {
+					return nil, err
+				}
+				message.Msg = ""
+				message.Mentions = nil
+			}
+			if hasAttachments() {
+				if err := sendAttachments(); err != nil {
+					return nil, err
+				}
+				message.Msg = ""
+			}
+			if hasText() {
+				if err := sendText(); err != nil {
+					return nil, err
 				}
 			}
 
@@ -409,4 +441,8 @@ func (q *SendMessageQuote) GetMessageType() int {
 	default:
 		return 1
 	}
+}
+
+func (c *MessageContent) IsPhotoDescription() bool {
+	return len(c.Attachments) == 1 && slices.Contains(config.SupportedImageExtensions, c.Attachments[0].GetExtension())
 }

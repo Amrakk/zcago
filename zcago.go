@@ -8,13 +8,13 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/Amrakk/zcago/api"
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/session"
-	"github.com/Amrakk/zcago/session/auth"
-	"github.com/Amrakk/zcago/version"
+	"github.com/amrakk/zcago/api"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/session"
+	"github.com/amrakk/zcago/session/auth"
+	"github.com/amrakk/zcago/version"
 )
 
 type Zalo interface {

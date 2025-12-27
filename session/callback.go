@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/model"
 )
 
 type UploadCallback = func(data model.UploadAttachment)

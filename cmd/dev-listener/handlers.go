@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 func (a *ListenerApp) handleMessage(msg model.Message) {

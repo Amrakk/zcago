@@ -1,4 +1,4 @@
-module github.com/Amrakk/zcago
+module github.com/amrakk/zcago
 
 go 1.25.1
 

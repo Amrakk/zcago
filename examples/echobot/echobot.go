@@ -6,9 +6,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Amrakk/zcago"
-	"github.com/Amrakk/zcago/api"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago"
+	"github.com/amrakk/zcago/api"
+	"github.com/amrakk/zcago/model"
 )
 
 func main() {

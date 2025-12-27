@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 type MessageStatusEventData struct {

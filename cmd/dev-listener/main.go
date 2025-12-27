@@ -9,9 +9,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/Amrakk/zcago"
-	"github.com/Amrakk/zcago/listener"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago"
+	"github.com/amrakk/zcago/listener"
+	"github.com/amrakk/zcago/model"
 )
 
 type ListenerApp struct {

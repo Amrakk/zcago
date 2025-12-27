@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/session"
 )
 
 type URLBuilder struct {

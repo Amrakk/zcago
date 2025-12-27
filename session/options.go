@@ -3,8 +3,8 @@ package session
 import (
 	"net/http"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/model"
 )
 
 type Option func(*options)

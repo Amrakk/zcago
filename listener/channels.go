@@ -3,8 +3,8 @@ package listener
 import (
 	"context"
 
-	"github.com/Amrakk/zcago/internal/websocketx"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/internal/websocketx"
+	"github.com/amrakk/zcago/model"
 )
 
 type Buffers struct {

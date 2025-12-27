@@ -21,7 +21,7 @@
 ## Installation
 
 ```bash
-go get github.com/Amrakk/zcago.git
+go get github.com/amrakk/zcago.git
 ```
 
 ---
@@ -61,8 +61,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Amrakk/zcago"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago"
+	"github.com/amrakk/zcago/model"
 )
 
 func main() {
@@ -112,9 +112,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/Amrakk/zcago"
-	"github.com/Amrakk/zcago/api"
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago"
+	"github.com/amrakk/zcago/api"
+	"github.com/amrakk/zcago/model"
 )
 
 func main() {

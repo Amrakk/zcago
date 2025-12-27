@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/Amrakk/zcago"
+	"github.com/amrakk/zcago"
 )
 
 type App struct {

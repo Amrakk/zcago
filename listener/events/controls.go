@@ -3,7 +3,7 @@ package events
 import (
 	"encoding/json"
 
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 type ControlEventData struct {

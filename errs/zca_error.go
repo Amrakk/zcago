@@ -3,7 +3,7 @@ package errs
 import (
 	"fmt"
 
-	"github.com/Amrakk/zcago/config"
+	"github.com/amrakk/zcago/config"
 )
 
 var (

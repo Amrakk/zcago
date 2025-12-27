@@ -1,6 +1,6 @@
 package model
 
-import "github.com/Amrakk/zcago/config"
+import "github.com/amrakk/zcago/config"
 
 type ReactionIcon string
 

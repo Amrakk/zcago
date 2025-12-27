@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/session"
 )
 
 type Level uint8

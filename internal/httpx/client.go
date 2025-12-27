@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/internal/cryptox"
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/internal/cryptox"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/session"
 )
 
 func Request(ctx context.Context, sc session.MutableContext, urlStr string, opt *RequestOptions) (*http.Response, error) {

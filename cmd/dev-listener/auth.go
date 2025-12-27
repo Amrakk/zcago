@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Amrakk/zcago"
+	"github.com/amrakk/zcago"
 )
 
 func (a *ListenerApp) authenticate() (zcago.API, error) {

@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 func metadataGetter(path string) (model.AttachmentMetadata, error) {

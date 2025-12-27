@@ -6,10 +6,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/httpx"
-	"github.com/Amrakk/zcago/internal/logger"
-	"github.com/Amrakk/zcago/internal/websocketx"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/httpx"
+	"github.com/amrakk/zcago/internal/logger"
+	"github.com/amrakk/zcago/internal/websocketx"
 )
 
 type retryState struct {

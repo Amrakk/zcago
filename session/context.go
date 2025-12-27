@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/Amrakk/zcago/model"
+	"github.com/amrakk/zcago/model"
 )
 
 type Context interface {

@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/Amrakk/zcago/errs"
+	"github.com/amrakk/zcago/errs"
 )
 
 type SecretKey string

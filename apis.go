@@ -3,10 +3,10 @@ package zcago
 import (
 	"context"
 
-	"github.com/Amrakk/zcago/api"
-	"github.com/Amrakk/zcago/listener"
-	"github.com/Amrakk/zcago/model"
-	"github.com/Amrakk/zcago/session"
+	"github.com/amrakk/zcago/api"
+	"github.com/amrakk/zcago/listener"
+	"github.com/amrakk/zcago/model"
+	"github.com/amrakk/zcago/session"
 )
 
 type API interface {

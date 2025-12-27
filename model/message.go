@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/Amrakk/zcago/config"
-	"github.com/Amrakk/zcago/errs"
+	"github.com/amrakk/zcago/config"
+	"github.com/amrakk/zcago/errs"
 )
 
 type Urgency int

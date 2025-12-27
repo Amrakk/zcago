@@ -3,7 +3,7 @@ package model
 import (
 	"encoding/json"
 
-	"github.com/Amrakk/zcago/errs"
+	"github.com/amrakk/zcago/errs"
 )
 
 type ReminderRepeatMode int

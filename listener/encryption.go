@@ -11,8 +11,8 @@ import (
 	"net/url"
 	"unicode/utf8"
 
-	"github.com/Amrakk/zcago/errs"
-	"github.com/Amrakk/zcago/internal/cryptox"
+	"github.com/amrakk/zcago/errs"
+	"github.com/amrakk/zcago/internal/cryptox"
 )
 
 const (
