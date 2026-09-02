@@ -60,6 +60,9 @@ var _ Client = (*client)(nil)
 func Dial(ctx context.Context, url string, opt *Options) (*client, error) {
 	cfg := defaultOptions()
 	if opt != nil {
+		if opt.HTTPClient != nil {
+			cfg.HTTPClient = opt.HTTPClient
+		}
 		if opt.Header != nil {
 			cfg.Header = opt.Header
 		}

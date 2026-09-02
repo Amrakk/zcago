@@ -67,3 +67,4 @@ qr.png
 /.dev
 test/**/*.test.*
 test/
+.idea
