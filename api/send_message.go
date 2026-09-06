@@ -7,10 +7,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
+	"unicode/utf16"
 
 	"github.com/amrakk/zcago/config"
 	"github.com/amrakk/zcago/errs"
@@ -26,6 +28,7 @@ var (
 	ErrInvalidMention             = errs.NewZCA("Invalid mentions: total mention characters exceed message length", "api.SendMessage")
 	ErrInvalidWebchatQuote        = errs.NewZCA("invalid quote: content must be string for msgType 'webchat'", "api.SendMessage")
 	ErrUnsupportedQuotedGroupPoll = errs.NewZCA("quoted message type 'group.poll' is not supported", "api.SendMessage")
+	ErrInvalidAttachmentUpload    = errs.NewZCA("attachment upload returned incomplete data", "api.SendMessage")
 )
 
 type TextStyle string
@@ -86,6 +89,10 @@ type (
 		Body    io.Reader
 		Headers http.Header
 	}
+	attachmentSendPayload struct {
+		Path   string
+		Params map[string]any
+	}
 
 	SendMessageResult struct {
 		MsgID string `json:"msgId"`
@@ -99,6 +106,129 @@ type (
 
 func (a *api) SendMessage(ctx context.Context, threadID string, threadType model.ThreadType, message MessageContent) (*SendMessageResponse, error) {
 	return a.e.SendMessage(ctx, threadID, threadType, message)
+}
+
+func prepareMentions(threadType model.ThreadType, msg string, mentions []model.TMention) ([]model.TMention, error) {
+	if threadType != model.ThreadTypeGroup {
+		return nil, nil
+	}
+
+	result := make([]model.TMention, 0, len(mentions))
+	totalLen := 0
+	for _, mention := range mentions {
+		if mention.Pos < 0 || mention.UID == "" || mention.Len <= 0 {
+			continue
+		}
+		if mention.UID == model.MentionAllUID {
+			mention.Type = model.MentionAll
+		} else {
+			mention.Type = model.MentionEach
+		}
+		totalLen += mention.Len
+		result = append(result, mention)
+	}
+	if totalLen > len(utf16.Encode([]rune(msg))) {
+		return nil, ErrInvalidMention
+	}
+	return result, nil
+}
+
+func prepareAttachmentPayloads(
+	uploads UploadAttachmentResponse,
+	threadID string,
+	threadType model.ThreadType,
+	message MessageContent,
+	mentions []model.TMention,
+	canBeDescription bool,
+	groupLayoutID string,
+	clientID int64,
+) ([]attachmentSendPayload, error) {
+	isGroup := threadType == model.ThreadTypeGroup
+	isMultiFile := len(uploads) > 1
+	result := make([]attachmentSendPayload, 0, len(uploads))
+
+	for index, upload := range uploads {
+		var path string
+		var payload map[string]any
+
+		switch upload.FileType {
+		case model.FileTypeImage:
+			if upload.Image == nil {
+				return nil, ErrInvalidAttachmentUpload
+			}
+			image := upload.Image
+			payload = map[string]any{
+				"photoId":  image.PhotoID,
+				"clientId": strconv.FormatInt(clientID, 10),
+				"desc":     message.Msg,
+				"width":    image.Width,
+				"height":   image.Height,
+				"rawUrl":   image.NormalURL,
+				"hdUrl":    image.HDURL,
+				"thumbUrl": image.ThumbURL,
+				"hdSize":   strconv.FormatInt(upload.TotalSize, 10),
+				"zsource":  -1,
+				"ttl":      message.TTL,
+				"jcp":      `{"convertible":"jxl"}`,
+			}
+			clientID++
+			if isGroup {
+				payload["grid"] = threadID
+				payload["oriUrl"] = image.NormalURL
+			} else {
+				payload["toid"] = threadID
+				payload["normalUrl"] = image.NormalURL
+			}
+			if isMultiFile {
+				payload["groupLayoutId"] = groupLayoutID
+				payload["isGroupLayout"] = 1
+				payload["idInGroup"] = index
+				payload["totalItemInGroup"] = len(uploads)
+				payload["extMsgProp"] = fmt.Sprintf(`{"groupMediaMsg":{"groupLayoutId":"%s"}}`, groupLayoutID)
+			}
+			if len(mentions) > 0 && canBeDescription && message.Quote == nil {
+				payload["mentionInfo"] = jsonx.Stringify(mentions)
+			}
+			path = "photo_original/send"
+
+		case model.FileTypeVideo, model.FileTypeOther:
+			if upload.File == nil {
+				return nil, ErrInvalidAttachmentUpload
+			}
+			file := upload.File
+			payload = map[string]any{
+				"fileId":      file.FileID,
+				"checksum":    file.Checksum,
+				"checksumSha": "",
+				"extention":   strings.TrimPrefix(strings.ToLower(filepath.Ext(file.FileName)), "."),
+				"totalSize":   upload.TotalSize,
+				"fileName":    file.FileName,
+				"clientId":    upload.ClientFileID,
+				"fType":       1,
+				"fileCount":   0,
+				"fdata":       "{}",
+				"fileUrl":     file.FileURL,
+				"zsource":     -1,
+				"ttl":         message.TTL,
+			}
+			if isGroup {
+				payload["grid"] = threadID
+			} else {
+				payload["toid"] = threadID
+			}
+			path = "asyncfile/msg"
+
+		default:
+			return nil, ErrInvalidAttachmentUpload
+		}
+
+		if message.Urgency == model.UrgImportant || message.Urgency == model.UrgUrgent {
+			payload["metaData"] = map[string]any{"urgency": message.Urgency}
+		}
+		result = append(result, attachmentSendPayload{Path: path, Params: payload})
+	}
+
+	return result, nil
 }
 
 var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
@@ -118,8 +248,8 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 				model.ThreadTypeGroup: u.MakeURL(groupBase+"/api/group", defaultParams, true),
 			},
 			Attachment: map[model.ThreadType]string{
-				model.ThreadTypeUser:  u.MakeURL(fileBase+"/api/message", nil, true),
-				model.ThreadTypeGroup: u.MakeURL(fileBase+"/api/group", nil, true),
+				model.ThreadTypeUser:  fileBase + "/api/message",
+				model.ThreadTypeGroup: fileBase + "/api/group",
 			},
 		}
 
@@ -179,6 +309,10 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 		handleMessage := func(threadID string, threadType model.ThreadType, message MessageContent) (*sendData, error) {
 			quote := message.Quote
 			isGroup := threadType == model.ThreadTypeGroup
+			mentions, err := prepareMentions(threadType, message.Msg, message.Mentions)
+			if err != nil {
+				return nil, err
+			}
 			if message.Quote != nil {
 				if quote.Content.String == nil && quote.MsgType == "webchat" {
 					return nil, ErrInvalidWebchatQuote
@@ -197,8 +331,10 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 
 			if isGroup {
 				payload["grid"] = threadID
-				payload["mentionInfo"] = jsonx.Stringify(message.Mentions)
 				payload["visibility"] = 0
+				if len(mentions) > 0 {
+					payload["mentionInfo"] = jsonx.Stringify(mentions)
+				}
 			} else {
 				payload["toid"] = threadID
 				payload["imei"] = sc.IMEI()
@@ -210,11 +346,11 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 				path = "/quote"
 			} else if !isGroup {
 				path = "/sms"
-			} else if payload["mentionInfo"] != nil {
+			} else if len(mentions) > 0 {
 				path = "/mention"
 			}
 
-			if message.Urgency != model.UrgDefault {
+			if message.Urgency == model.UrgImportant || message.Urgency == model.UrgUrgent {
 				payload["metaData"] = map[string]any{"urgency": message.Urgency}
 			}
 
@@ -239,19 +375,74 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 			}, nil
 		}
 
-		handleAttachment := func(threadID string, threadType model.ThreadType, message MessageContent) ([]sendData, error) {
-			// isGroup := threadType == model.ThreadTypeGroup
-			panic("not implemented")
+		handleAttachment := func(ctx context.Context, threadID string, threadType model.ThreadType, message MessageContent) ([]sendData, []model.AttachmentSource, error) {
+			if len(message.Attachments) == 0 {
+				return nil, nil, errs.ErrSourceEmpty
+			}
+
+			canBeDescription := message.IsPhotoDescription()
+			attachments := make([]model.AttachmentSource, 0, len(message.Attachments))
+			gifs := make([]model.AttachmentSource, 0, len(message.Attachments))
+			for _, source := range message.Attachments {
+				if source.GetExtension() == "gif" {
+					gifs = append(gifs, source)
+				} else {
+					attachments = append(attachments, source)
+				}
+			}
+
+			var uploads UploadAttachmentResponse
+			if len(attachments) > 0 {
+				var err error
+				uploads, err = a.UploadAttachment(ctx, threadID, threadType, attachments...)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+
+			mentions, err := prepareMentions(threadType, message.Msg, message.Mentions)
+			if err != nil {
+				return nil, nil, err
+			}
+			payloads, err := prepareAttachmentPayloads(
+				uploads,
+				threadID,
+				threadType,
+				message,
+				mentions,
+				canBeDescription,
+				strconv.FormatInt(time.Now().UnixMilli(), 10),
+				time.Now().UnixMilli(),
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			result := make([]sendData, 0, len(payloads))
+			for _, payload := range payloads {
+				enc, err := u.EncodeAES(jsonx.Stringify(payload.Params))
+				if err != nil {
+					return nil, nil, errs.WrapZCA("failed to encrypt params", "api.SendMessage", err)
+				}
+				result = append(result, sendData{
+					URL: u.MakeURL(
+						serviceURLs.Attachment[threadType]+"/"+payload.Path,
+						map[string]any{"nretry": "0"},
+						true,
+					),
+					Body: httpx.BuildFormBody(map[string]string{"params": enc}),
+				})
+			}
+			return result, gifs, nil
 		}
 
 		sendMessage := func(ctx context.Context, sendData []sendData) ([]SendMessageResult, error) {
 			var (
-				mu      sync.Mutex
 				g, gctx = errgroup.WithContext(ctx)
-				results = make([]SendMessageResult, 0, len(sendData))
+				results = make([]SendMessageResult, len(sendData))
 			)
 
-			for _, data := range sendData {
+			for index, data := range sendData {
 				g.Go(func() error {
 					resp, err := u.Request(gctx, data.URL, &httpx.RequestOptions{
 						Method:  http.MethodPost,
@@ -268,9 +459,7 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 						return err
 					}
 
-					mu.Lock()
-					results = append(results, res)
-					mu.Unlock()
+					results[index] = res
 
 					return nil
 				})
@@ -311,7 +500,7 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 			}
 
 			sendAttachments := func() error {
-				data, err := handleAttachment(threadID, threadType, message)
+				data, gifs, err := handleAttachment(ctx, threadID, threadType, message)
 				if err != nil {
 					return err
 				}
@@ -319,7 +508,22 @@ var sendMessageFactory = apiFactory[*SendMessageResponse, SendMessageFn]()(
 				if err != nil {
 					return err
 				}
-				results.Attachment = resps
+				results.Attachment = append(results.Attachment, resps...)
+				for _, source := range gifs {
+					resp, err := a.SendGIF(ctx, threadID, threadType, GIFContent{
+						Attachment: source,
+						Msg:        message.Msg,
+						TTL:        message.TTL,
+						Urgency:    message.Urgency,
+					})
+					if err != nil {
+						return err
+					}
+					if resp == nil {
+						return ErrInvalidAttachmentUpload
+					}
+					results.Attachment = append(results.Attachment, SendMessageResult{MsgID: resp.MsgID})
+				}
 				return nil
 			}
 

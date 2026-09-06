@@ -2,16 +2,19 @@ package api
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
 	"time"
 
+	"github.com/amrakk/zcago/config"
 	"github.com/amrakk/zcago/errs"
 	"github.com/amrakk/zcago/internal/httpx"
 	"github.com/amrakk/zcago/internal/jsonx"
@@ -41,12 +44,12 @@ type (
 		ChunkID    int     `json:"chunkId"`
 	}
 	fileAttachmentData struct {
-		FilePath     string                 `json:"filePath"`
-		FileType     model.FileType         `json:"fileType"` // "video" | "others"
-		ChunkContent []httpx.FormData       `json:"chunkContent"`
-		FileData     fileData               `json:"fileData"`
-		Params       attachmentParams       `json:"params"`
-		Source       model.AttachmentSource `json:"source"`
+		FilePath     string           `json:"filePath"`
+		FileType     model.FileType   `json:"fileType"` // "video" | "others"
+		ChunkContent []httpx.FormData `json:"chunkContent"`
+		FileData     fileData         `json:"fileData"`
+		Params       attachmentParams `json:"params"`
+		Checksum     string           `json:"checksum"`
 	}
 
 	rawResponse struct {
@@ -154,17 +157,31 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 
 					reader = r
 					closer = r
+					fileName = filepath.Base(f)
+					stat, err := r.Stat()
+					if err != nil {
+						cleanup()
+						return nil, errs.WrapZCA("failed to stat file", "api.UploadAttachment", err)
+					}
+					fileMetadata.Size = stat.Size()
+				} else if f := source.Object(); f != nil {
+					reader, fileName, fileMetadata = f.Data, f.Filename, f.Metadata
+				}
+				if reader == nil || fileName == "" {
+					cleanup()
+					return nil, errs.ErrSourceEmpty
+				}
 
-					fileMetadata, fileName, err = sc.GetImageMetadata(f)
+				ext := source.GetExtension()
+				if source.IsString() && slices.Contains(config.SupportedImageExtensions, ext) {
+					imageMetadata, _, err := sc.GetImageMetadata(source.String())
 					if err != nil {
 						cleanup()
 						return nil, err
 					}
-				} else if f := source.Object(); f != nil {
-					reader, fileName, fileMetadata = f.Data, f.Filename, f.Metadata
+					fileMetadata.Width = imageMetadata.Width
+					fileMetadata.Height = imageMetadata.Height
 				}
-
-				ext := source.GetExtension()
 				if !isValidExtension(ext) {
 					cleanup()
 					return nil, errs.ErrInvalidExtension
@@ -174,8 +191,9 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 					return nil, errs.ErrExceedMaxFileSize
 				}
 
+				hash := md5.New()
 				forms, err := httpx.BuildFormData(
-					"chunkContent", reader,
+					"chunkContent", io.TeeReader(reader, hash),
 					httpx.WithContentType("application/octet-stream"),
 					httpx.WithFileName(fileName),
 					httpx.WithChunkSize(chunkSize),
@@ -231,8 +249,8 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 						Width:     &fileMetadata.Width,
 						Height:    &fileMetadata.Height,
 					},
-					Params: params,
-					Source: source,
+					Params:   params,
+					Checksum: fmt.Sprintf("%x", hash.Sum(nil)),
 				})
 			}
 
@@ -241,21 +259,29 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 				typeParam = "11"
 			}
 
+			targetBase := serviceURL + "/message"
 			if isGroup {
-				serviceURL += "/group"
-			} else {
-				serviceURL += "/message"
+				targetBase = serviceURL + "/group"
 			}
 
+			type callbackResult struct {
+				index  int
+				result UploadAttachment
+			}
 			var (
-				mu      sync.Mutex
-				g, gctx = errgroup.WithContext(ctx)
-				results = make([]UploadAttachment, 0, len(attachments))
-				cbWG    sync.WaitGroup
+				mu              sync.Mutex
+				g, gctx         = errgroup.WithContext(ctx)
+				results         = make([]UploadAttachment, len(attachments))
+				completed       = make([]bool, len(attachments))
+				callbackSet     = make([]bool, len(attachments))
+				callbackCount   int
+				pendingIDs      = make(map[string]struct{})
+				callbackResults = make(chan callbackResult, len(attachments))
 			)
 
 			for ai := range attachments {
 				a := attachments[ai]
+				attachmentIndex := ai
 				baseParams := a.Params
 
 				for ci := 0; ci < baseParams.TotalChunk; ci++ {
@@ -271,7 +297,7 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 						}
 
 						url := u.MakeURL(
-							serviceURL+pathMap[a.FileType],
+							targetBase+pathMap[a.FileType],
 							map[string]any{"type": typeParam, "params": enc},
 							true,
 						)
@@ -291,20 +317,27 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 							return err
 						}
 
-						hasFileID := data.FileID != nil && *data.FileID != "-1"
-						hasPhotoID := data.PhotoID != nil && *data.PhotoID != "-1"
+						switch a.FileType {
+						case model.FileTypeVideo, model.FileTypeOther:
+							if data.FileID == nil || *data.FileID == "-1" {
+								return nil
+							}
+							fileID := *data.FileID
 
-						if hasFileID || hasPhotoID {
-							switch a.FileType {
-							case model.FileTypeVideo, model.FileTypeOther:
-								fileID := *data.FileID
+							mu.Lock()
+							if callbackSet[attachmentIndex] {
+								mu.Unlock()
+								return nil
+							}
+							callbackSet[attachmentIndex] = true
+							callbackCount++
+							pendingIDs[fileID] = struct{}{}
+							mu.Unlock()
 
-								cbWG.Add(1)
-								uploadCallback := func(wsData model.UploadAttachment) {
-									defer cbWG.Done()
-									checksum := a.Source.GetLargeFileMD5()
-
-									result := UploadAttachment{
+							sc.UploadCallback().Set(fileID, func(wsData model.UploadAttachment) {
+								callbackResults <- callbackResult{
+									index: attachmentIndex,
+									result: UploadAttachment{
 										FileType:     a.FileType,
 										Finished:     data.Finished,
 										ClientFileID: data.ClientFileID,
@@ -314,50 +347,80 @@ var uploadAttachmentFactory = apiFactory[UploadAttachmentResponse, UploadAttachm
 											FileID:   fileID,
 											FileURL:  wsData.FileURL,
 											FileName: a.FileData.FileName,
-											Checksum: checksum.Checksum,
+											Checksum: a.Checksum,
 										},
-									}
-
-									mu.Lock()
-									results = append(results, result)
-									mu.Unlock()
-								}
-
-								sc.UploadCallback().Set(fileID, uploadCallback, 0)
-
-							case model.FileTypeImage:
-								result := UploadAttachment{
-									FileType:     model.FileTypeImage,
-									Finished:     data.Finished,
-									ClientFileID: data.ClientFileID,
-									ChunkID:      data.ChunkID,
-									TotalSize:    a.FileData.TotalSize,
-
-									Image: &UploadImageInfo{
-										HDSize:    a.FileData.TotalSize,
-										PhotoID:   *data.PhotoID,
-										Width:     *a.FileData.Width,
-										Height:    *a.FileData.Height,
-										NormalURL: *data.NormalURL,
-										HDURL:     *data.HDURL,
-										ThumbURL:  *data.ThumbURL,
 									},
 								}
+							}, 0)
 
-								mu.Lock()
-								results = append(results, result)
-								mu.Unlock()
+						case model.FileTypeImage:
+							if data.PhotoID == nil || *data.PhotoID == "-1" || data.NormalURL == nil || data.HDURL == nil || data.ThumbURL == nil {
+								return nil
 							}
+							result := UploadAttachment{
+								FileType:     model.FileTypeImage,
+								Finished:     data.Finished,
+								ClientFileID: data.ClientFileID,
+								ChunkID:      data.ChunkID,
+								TotalSize:    a.FileData.TotalSize,
+								Image: &UploadImageInfo{
+									HDSize:    a.FileData.TotalSize,
+									PhotoID:   *data.PhotoID,
+									Width:     *a.FileData.Width,
+									Height:    *a.FileData.Height,
+									NormalURL: *data.NormalURL,
+									HDURL:     *data.HDURL,
+									ThumbURL:  *data.ThumbURL,
+								},
+							}
+
+							mu.Lock()
+							results[attachmentIndex] = result
+							completed[attachmentIndex] = true
+							mu.Unlock()
 						}
 						return nil
 					})
 				}
 			}
 
+			cleanupCallbacks := func() {
+				mu.Lock()
+				defer mu.Unlock()
+				for fileID := range pendingIDs {
+					sc.UploadCallback().Delete(fileID)
+				}
+			}
 			if err := g.Wait(); err != nil {
+				cleanupCallbacks()
 				return nil, err
 			}
-			cbWG.Wait()
+			if callbackCount > 0 {
+				timer := time.NewTimer(config.DefaultUploadCallbackTTL)
+				defer timer.Stop()
+				for range callbackCount {
+					select {
+					case callback := <-callbackResults:
+						results[callback.index] = callback.result
+						completed[callback.index] = true
+						mu.Lock()
+						delete(pendingIDs, callback.result.File.FileID)
+						mu.Unlock()
+					case <-ctx.Done():
+						cleanupCallbacks()
+						return nil, errs.WrapZCA("attachment upload canceled", "api.UploadAttachment", ctx.Err())
+					case <-timer.C:
+						cleanupCallbacks()
+						return nil, errs.NewZCA("timed out waiting for attachment upload", "api.UploadAttachment")
+					}
+				}
+			}
+			for _, done := range completed {
+				if !done {
+					cleanupCallbacks()
+					return nil, errs.NewZCA("attachment upload returned incomplete data", "api.UploadAttachment")
+				}
+			}
 
 			return results, nil
 		}, nil

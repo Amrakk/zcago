@@ -3,23 +3,21 @@ package api
 import (
 	"bytes"
 	"context"
-	"errors"
+	"crypto/md5"
+	"encoding/hex"
 	"image/gif"
 	"image/png"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
-	"sync/atomic"
 	"time"
 
-	"github.com/amrakk/zcago/config"
 	"github.com/amrakk/zcago/errs"
 	"github.com/amrakk/zcago/internal/httpx"
 	"github.com/amrakk/zcago/internal/jsonx"
 	"github.com/amrakk/zcago/model"
 	"github.com/amrakk/zcago/session"
-	"golang.org/x/sync/errgroup"
 )
 
 type (
@@ -46,7 +44,9 @@ type (
 	GIFContent struct {
 		Attachment model.AttachmentSource
 		Thumb      *model.AttachmentSource
+		Msg        string
 		TTL        int // Time to live in milliseconds
+		Urgency    model.Urgency
 	}
 
 	SendGIFResponse struct {
@@ -63,9 +63,14 @@ func (a *api) SendGIF(ctx context.Context, threadID string, threadType model.Thr
 var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 	func(a *api, sc session.Context, u factoryUtils[*SendGIFResponse]) (SendGIFFn, error) {
 		base := jsonx.FirstOr(sc.GetZpwService("file"), "")
+		shareFile := sc.Settings().Features.ShareFile
 		serviceURLs := map[model.ThreadType]string{
 			model.ThreadTypeUser:  u.MakeURL(base+"/api/message/gif", nil, true),
 			model.ThreadTypeGroup: u.MakeURL(base+"/api/group/gif", nil, true),
+		}
+
+		isExceedMaxFileSize := func(totalSize int64) bool {
+			return totalSize > shareFile.MaxSizeShareFileV3*1024*1024
 		}
 
 		return func(ctx context.Context, threadID string, threadType model.ThreadType, content GIFContent) (*SendGIFResponse, error) {
@@ -92,14 +97,21 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 			} else if f := content.Attachment.Object(); f != nil {
 				reader, fileName, fileMetadata = f.Data, f.Filename, f.Metadata
 			}
+			if closer != nil {
+				defer closer.Close()
+			}
+			if reader == nil || fileName == "" {
+				return nil, errs.ErrSourceEmpty
+			}
+			if isExceedMaxFileSize(fileMetadata.Size) {
+				return nil, errs.ErrExceedMaxFileSize
+			}
 
 			data, err := io.ReadAll(reader)
 			if err != nil {
 				return nil, errs.WrapZCA("failed to read attachment data", "api.SendGIF", err)
 			}
-			if closer != nil {
-				_ = closer.Close()
-			}
+			checksum := md5.Sum(data)
 
 			if content.Thumb == nil {
 				g, err := gif.DecodeAll(bytes.NewReader(data))
@@ -136,7 +148,6 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				"chunkContent", bytes.NewReader(data),
 				httpx.WithContentType("application/octet-stream"),
 				httpx.WithFileName(fileName),
-				httpx.WithChunkSize(config.GIFChunkSize),
 			)
 			if err != nil || len(forms) == 0 || forms[0] == nil {
 				return nil, errs.WrapZCA("failed to build form data", "api.SendGIF", err)
@@ -153,13 +164,16 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				TotalSize:  fileMetadata.Size,
 				Width:      fileMetadata.Width,
 				Height:     fileMetadata.Height,
-				Msg:        "",
+				Msg:        content.Msg,
 				Type:       1,
 				TTL:        content.TTL,
 				Thumb:      thumb.URL,
-				Checksum:   content.Attachment.GetLargeFileMD5().Checksum,
-				TotalChunk: len(forms),
+				Checksum:   hex.EncodeToString(checksum[:]),
+				TotalChunk: 1,
 				ChunkID:    1,
+			}
+			if content.Urgency == model.UrgImportant || content.Urgency == model.UrgUrgent {
+				payload.MetaData = map[string]any{"urgency": content.Urgency}
 			}
 
 			if threadType == model.ThreadTypeGroup {
@@ -170,55 +184,26 @@ var sendGIFFactory = apiFactory[*SendGIFResponse, SendGIFFn]()(
 				payload.ToID = threadID
 			}
 
-			var results atomic.Pointer[SendGIFResponse]
-
-			g, gctx := errgroup.WithContext(ctx)
-			for i := range forms {
-				chunk := i
-
-				g.Go(func() error {
-					p := payload
-					p.ChunkID = chunk + 1
-
-					enc, err := u.EncodeAES(jsonx.Stringify(p))
-					if err != nil {
-						return errs.WrapZCA("failed to encrypt params", "api.SendGIF", err)
-					}
-					url := u.MakeURL(
-						serviceURLs[threadType],
-						map[string]any{"type": "1", "params": enc},
-						true,
-					)
-
-					reqCtx := gctx
-					resp, err := u.Request(reqCtx, url, &httpx.RequestOptions{
-						Method:  http.MethodPost,
-						Headers: forms[chunk].Header,
-						Body:    forms[chunk].Body,
-					})
-					if err != nil {
-						return err
-					}
-					defer resp.Body.Close()
-
-					r, err := resolveResponse[*SendGIFResponse](sc, resp, true)
-					if err != nil {
-						var zerr errs.ZaloAPIError
-						if errors.As(err, &zerr) && zerr.Code != nil && *zerr.Code == 220 {
-							return nil
-						}
-						return err
-					}
-					results.Store(r)
-
-					return nil
-				})
+			enc, err := u.EncodeAES(jsonx.Stringify(payload))
+			if err != nil {
+				return nil, errs.WrapZCA("failed to encrypt params", "api.SendGIF", err)
 			}
-			if err := g.Wait(); err != nil {
+			url := u.MakeURL(
+				serviceURLs[threadType],
+				map[string]any{"type": "1", "params": enc},
+				true,
+			)
+			resp, err := u.Request(ctx, url, &httpx.RequestOptions{
+				Method:  http.MethodPost,
+				Headers: forms[0].Header,
+				Body:    forms[0].Body,
+			})
+			if err != nil {
 				return nil, err
 			}
+			defer resp.Body.Close()
 
-			return results.Load(), nil
+			return resolveResponse[*SendGIFResponse](sc, resp, true)
 		}, nil
 	},
 )
