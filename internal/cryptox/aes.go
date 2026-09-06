@@ -49,11 +49,16 @@ func DecodeAESCBC(key []byte, data string) ([]byte, error) {
 		return nil, fmt.Errorf("cryptox: new cipher: %w", err)
 	}
 
-	iv := make([]byte, aes.BlockSize)
+	blockSize := aes.BlockSize
+	if len(ciphertext) == 0 || len(ciphertext)%blockSize != 0 {
+		return nil, fmt.Errorf("cryptox: invalid ciphertext length")
+	}
+
+	iv := make([]byte, blockSize)
 	plain := make([]byte, len(ciphertext))
 	cipher.NewCBCDecrypter(block, iv).CryptBlocks(plain, ciphertext)
 
-	plain, err = Pkcs7Unpadding(plain, aes.BlockSize)
+	plain, err = Pkcs7Unpadding(plain, blockSize)
 	if err != nil {
 		return nil, fmt.Errorf("cryptox: pkcs7 unpadding: %w", err)
 	}
