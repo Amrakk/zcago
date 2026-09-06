@@ -86,26 +86,30 @@ func executeRequest(sc session.MutableContext, req *http.Request, followRedirect
 	return client.Do(req)
 }
 
-func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncrypted bool) *ZaloResponse[T] {
+func handleZaloResponse[T any](
+	sc session.Context,
+	resp *http.Response,
+	isEncrypted bool,
+) *ZaloResponse[T] {
 	out := &ZaloResponse[T]{}
 
 	if !IsSuccess(resp) {
-		out.Meta.Code = resp.StatusCode
-		out.Meta.Message = "Request failed with status " + resp.Status
-		return out
+		return buildError[T](
+			resp.StatusCode,
+			"Request failed with status "+resp.Status,
+		)
 	}
 
 	base, err := ParseBaseResponse(resp)
 	if err != nil {
 		logger.Log(sc).Error("Failed to parse response:", err)
-		out.Meta.Message = "Failed to parse response data"
-		return out
+		return buildError[T](0, "Failed to parse response data")
 	}
+
 	if base.ErrorCode != 0 {
-		out.Meta.Code = base.ErrorCode
-		out.Meta.Message = base.ErrorMessage
-		return out
+		return buildError[T](base.ErrorCode, base.ErrorMessage)
 	}
+
 	if base.Data == nil || *base.Data == "" {
 		return out
 	}
@@ -114,18 +118,17 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 
 	if isEncrypted {
 		key := sc.SecretKey().Bytes()
-		if key == nil {
-			logger.Log(sc).Error("Failed to decode secret key:", err)
-			out.Meta.Message = "Failed to decode secret key"
-			return out
+		if len(key) == 0 {
+			logger.Log(sc).Error("Secret key is empty")
+			return buildError[T](0, "Failed to decode secret key")
 		}
 
 		plain, err := cryptox.DecodeAESCBC(key, *base.Data)
 		if err != nil {
 			logger.Log(sc).Error("Failed to decrypt payload:", err)
-			out.Meta.Message = "Failed to decrypt response data"
-			return out
+			return buildError[T](0, "Failed to decrypt response data")
 		}
+
 		payloadBytes = plain
 	} else {
 		payloadBytes = []byte(*base.Data)
@@ -134,14 +137,11 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 	var decodedMeta Response[json.RawMessage]
 	if err := json.Unmarshal(payloadBytes, &decodedMeta); err != nil {
 		logger.Log(sc).Error("Failed to unmarshal payload:", err)
-		out.Meta.Message = "Failed to parse response data"
-		return out
+		return buildError[T](0, "Failed to parse response data")
 	}
 
 	if decodedMeta.ErrorCode != 0 {
-		out.Meta.Code = decodedMeta.ErrorCode
-		out.Meta.Message = decodedMeta.ErrorMessage
-		return out
+		return buildError[T](decodedMeta.ErrorCode, decodedMeta.ErrorMessage)
 	}
 
 	if len(decodedMeta.Data) == 0 || string(decodedMeta.Data) == "null" {
@@ -151,8 +151,7 @@ func handleZaloResponse[T any](sc session.Context, resp *http.Response, isEncryp
 	var decoded T
 	if err := json.Unmarshal(decodedMeta.Data, &decoded); err != nil {
 		logger.Log(sc).Error("unmarshal data field:", err)
-		out.Meta.Message = "Failed to parse response data"
-		return out
+		return buildError[T](0, "Failed to parse response data")
 	}
 
 	out.Data = decoded

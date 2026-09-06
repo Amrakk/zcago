@@ -343,10 +343,10 @@ func resolveResponse[T any](
 	if r == nil {
 		return zero, errs.NewZCA("empty response", "api.resolveResponse")
 	}
-	if r.Meta.Code != 0 {
+	if r.Error != nil {
 		var zero T
-		code := errs.ZaloErrorCode(r.Meta.Code)
-		return zero, errs.NewZaloAPIError(r.Meta.Message, &code)
+		code := errs.ZaloErrorCode(r.Error.Code)
+		return zero, errs.NewZaloAPIError(r.Error.Message, &code)
 	}
 
 	return r.Data, nil

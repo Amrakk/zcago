@@ -91,11 +91,13 @@ type Response[T any] struct {
 type BaseResponse = Response[*string]
 
 type ZaloResponse[T any] struct {
-	Meta struct {
-		Code    int
-		Message string
-	}
-	Data T
+	Error *errorResponse
+	Data  T
+}
+
+type errorResponse struct {
+	Code    int
+	Message string
 }
 
 func ParseBaseResponse(resp *http.Response) (*BaseResponse, error) {
@@ -112,4 +114,14 @@ func ParseZaloResponse[T any](resp *http.Response) (*ZaloResponse[T], error) {
 		return nil, err
 	}
 	return &result, nil
+}
+
+func buildError[T any](code int, message string) *ZaloResponse[T] {
+	return &ZaloResponse[T]{
+		Error: &errorResponse{
+			Code:    code,
+			Message: message,
+		},
+		Data: *new(T),
+	}
 }
