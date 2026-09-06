@@ -67,7 +67,7 @@ func defaultOptions() options {
 		logLevel:    1, // Debug level by default
 		apiType:     config.DefaultAPIType,
 		apiVersion:  config.DefaultAPIVersion,
-		client:      http.DefaultClient,
+		client:      &http.Client{},
 	}
 }
 
