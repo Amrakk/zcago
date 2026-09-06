@@ -121,19 +121,21 @@ func (ln *listener) handleOldMessages(ctx context.Context, body BaseWSMessage) {
 		return
 	}
 
+	uid := ln.sc.UID()
+	threadType := model.ThreadTypeUser
 	messages := make([]model.Message, 0, len(eventData.Data.Msgs)+len(eventData.Data.GroupMsgs))
 
-	threadType := model.ThreadTypeUser
-	selected := eventData.Data.Msgs
 	if len(eventData.Data.GroupMsgs) > 0 {
 		threadType = model.ThreadTypeGroup
-		selected = eventData.Data.GroupMsgs
-	}
+		messages = make([]model.Message, 0, len(eventData.Data.GroupMsgs))
 
-	uid := ln.sc.UID()
-	for _, msg := range selected {
-		messageObject := model.NewUserMessage(uid, msg)
-		messages = append(messages, messageObject)
+		for _, msg := range eventData.Data.GroupMsgs {
+			messages = append(messages, model.NewGroupMessage(uid, msg))
+		}
+	} else {
+		for _, msg := range eventData.Data.Msgs {
+			messages = append(messages, model.NewUserMessage(uid, msg))
+		}
 	}
 
 	emit(ctx, ln.ch.OldMessages, model.NewOldMessage(messages, threadType))

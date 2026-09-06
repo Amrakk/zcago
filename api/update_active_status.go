@@ -37,13 +37,12 @@ var updateActiveStatusFactory = apiFactory[*UpdateActiveStatusResponse, UpdateAc
 				return nil, errs.WrapZCA("failed to encrypt params", "api.UpdateActiveStatus", err)
 			}
 
+			targetBase := serviceURL + "/deactive"
 			if isActive {
-				serviceURL += "/ping"
-			} else {
-				serviceURL += "/deactive"
+				targetBase = serviceURL + "/ping"
 			}
 
-			url := u.MakeURL(serviceURL, map[string]any{"params": enc}, true)
+			url := u.MakeURL(targetBase, map[string]any{"params": enc}, true)
 			resp, err := u.Request(ctx, url, &httpx.RequestOptions{Method: http.MethodGet})
 			if err != nil {
 				return nil, err

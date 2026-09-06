@@ -117,6 +117,7 @@ type QRGeneratedData struct {
 	Code    string             `json:"code"`
 	Image   string             `json:"image"` // base64-encoded image data
 	Options QRGeneratedOptions `json:"options"`
+	Token   string             `json:"token"`
 }
 
 type QRScannedData struct {

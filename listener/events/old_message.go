@@ -5,6 +5,6 @@ import (
 )
 
 type OldMessagesEventData struct {
-	Msgs      []model.TMessage `json:"msgs"`
-	GroupMsgs []model.TMessage `json:"groupMsgs"`
+	Msgs      []model.TMessage      `json:"msgs"`
+	GroupMsgs []model.TGroupMessage `json:"groupMsgs"`
 }
