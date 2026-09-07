@@ -71,9 +71,12 @@ func requestWithRedirect(ctx context.Context, sc session.MutableContext, urlStr 
 }
 
 func executeRequest(sc session.MutableContext, req *http.Request, followRedirects bool) (*http.Response, error) {
-	client := sc.Client()
-	if client == nil {
-		client = http.DefaultClient
+	baseClient := sc.Client()
+	if baseClient == nil {
+		baseClient = http.DefaultClient
+	}
+	client := *baseClient
+	if client.Jar == nil {
 		client.Jar = sc.CookieJar()
 	}
 

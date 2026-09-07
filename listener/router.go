@@ -54,6 +54,9 @@ func (ln *listener) router(ctx context.Context, version, cmd, sub uint, body Bas
 }
 
 func (ln *listener) handleCipherKey(ctx context.Context, body BaseWSMessage) {
+	if body.Key == nil {
+		return
+	}
 	key := *body.Key
 	if key == "" {
 		return
