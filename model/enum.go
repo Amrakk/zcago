@@ -7,6 +7,17 @@ const (
 	ThreadTypeGroup
 )
 
+type AvatarSize int
+
+const (
+	AvatarSizeSmall AvatarSize = 120
+	AvatarSizeLarge AvatarSize = 240
+)
+
+func (s AvatarSize) IsValid() bool {
+	return s == AvatarSizeSmall || s == AvatarSizeLarge
+}
+
 type DestType uint8
 
 const (

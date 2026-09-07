@@ -12,6 +12,8 @@ import (
 	"github.com/amrakk/zcago/session"
 )
 
+var ErrInvalidAvatarSize = errs.NewZCA("avatar size must be 120 or 240", "")
+
 func New(sc session.MutableContext) (*api, error) {
 	a := &api{sc: sc}
 

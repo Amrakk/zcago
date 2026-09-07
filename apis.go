@@ -264,6 +264,15 @@ type API interface {
 	//
 	// Errors: errs.ZaloAPIError, api.ErrPhoneNumberEmpty
 	FindUser(ctx context.Context, phoneNumber ...string) (*api.FindUserResponse, error)
+	// FindUserWithAvatarSize finds users by phone number with the requested avatar size.
+	//
+	// Params:
+	//   - ctx - cancel/deadline control
+	//   - avatarSize - returned avatar size ([model.AvatarSizeSmall] or [model.AvatarSizeLarge])
+	//   - phoneNumber - phone number(s); leading zeroes are normalized to country code 84 for Vietnamese sessions
+	//
+	// Errors: errs.ZaloAPIError, api.ErrPhoneNumberEmpty, api.ErrInvalidAvatarSize
+	FindUserWithAvatarSize(ctx context.Context, avatarSize model.AvatarSize, phoneNumber ...string) (*api.FindUserResponse, error)
 	// ForwardMessage forwards a message to multiple threads.
 	//
 	// Params:
@@ -299,6 +308,15 @@ type API interface {
 	//
 	// Errors: errs.ZaloAPIError
 	GetAllFriends(ctx context.Context, options model.OffsetPaginationOptions) (*api.GetAllFriendsResponse, error)
+	// GetAllFriendsWithAvatarSize retrieves all friends with the requested avatar size.
+	//
+	// Params:
+	//   - ctx - cancel/deadline control
+	//   - options - offset pagination options (default Count:20000, Page:1)
+	//   - avatarSize - returned avatar size ([model.AvatarSizeSmall] or [model.AvatarSizeLarge])
+	//
+	// Errors: errs.ZaloAPIError, api.ErrInvalidAvatarSize
+	GetAllFriendsWithAvatarSize(ctx context.Context, options model.OffsetPaginationOptions, avatarSize model.AvatarSize) (*api.GetAllFriendsResponse, error)
 	// GetAllGroups retrieves all groups.
 	//
 	// Params:
@@ -549,6 +567,15 @@ type API interface {
 	//
 	// Errors: errs.ZaloAPIError
 	GetUserInfo(ctx context.Context, userID ...string) (*api.GetUserInfoResponse, error)
+	// GetUserInfoWithAvatarSize returns profiles for userID with the requested avatar size.
+	//
+	// Params:
+	//   - ctx - cancel/deadline control
+	//   - avatarSize - returned avatar size ([model.AvatarSizeSmall] or [model.AvatarSizeLarge])
+	//   - userID - user ID(s)
+	//
+	// Errors: errs.ZaloAPIError, api.ErrInvalidAvatarSize
+	GetUserInfoWithAvatarSize(ctx context.Context, avatarSize model.AvatarSize, userID ...string) (*api.GetUserInfoResponse, error)
 	// GetUserSummaryInfo retrieves user summary information by user ID.
 	//
 	// Params:

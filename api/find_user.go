@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/amrakk/zcago/errs"
 	"github.com/amrakk/zcago/internal/httpx"
@@ -27,11 +28,15 @@ type (
 		ZaloName    string                 `json:"zalo_name"`
 		DisplayName string                 `json:"display_name"`
 	}
-	FindUserFn = func(ctx context.Context, phoneNumber ...string) (*FindUserResponse, error)
+	FindUserFn = func(ctx context.Context, avatarSize model.AvatarSize, phoneNumber ...string) (*FindUserResponse, error)
 )
 
 func (a *api) FindUser(ctx context.Context, phoneNumber ...string) (*FindUserResponse, error) {
-	return a.e.FindUser(ctx, phoneNumber...)
+	return a.e.FindUser(ctx, model.AvatarSizeLarge, phoneNumber...)
+}
+
+func (a *api) FindUserWithAvatarSize(ctx context.Context, avatarSize model.AvatarSize, phoneNumber ...string) (*FindUserResponse, error) {
+	return a.e.FindUser(ctx, avatarSize, phoneNumber...)
 }
 
 var findUserFactory = apiFactory[*FindUserResponse, FindUserFn]()(
@@ -39,14 +44,17 @@ var findUserFactory = apiFactory[*FindUserResponse, FindUserFn]()(
 		base := jsonx.FirstOr(sc.GetZpwService("friend"), "")
 		serviceURL := u.MakeURL(base+"/api/friend/profile/multiget", nil, true)
 
-		return func(ctx context.Context, phoneNumber ...string) (*FindUserResponse, error) {
+		return func(ctx context.Context, avatarSize model.AvatarSize, phoneNumber ...string) (*FindUserResponse, error) {
+			if !avatarSize.IsValid() {
+				return nil, ErrInvalidAvatarSize
+			}
 			if len(phoneNumber) == 0 {
 				return nil, ErrPhoneNumberEmpty
 			}
 
 			payload := map[string]any{
-				"phones":      phoneNumber,
-				"avatar_size": 240,
+				"phones":      normalizePhoneNumbers(sc.Language(), phoneNumber),
+				"avatar_size": avatarSize,
 				"language":    sc.Language(),
 			}
 
@@ -66,3 +74,17 @@ var findUserFactory = apiFactory[*FindUserResponse, FindUserFn]()(
 		}, nil
 	},
 )
+
+func normalizePhoneNumbers(language string, phoneNumbers []string) []string {
+	if language != "vi" {
+		return phoneNumbers
+	}
+
+	normalized := append([]string(nil), phoneNumbers...)
+	for i, phone := range normalized {
+		if strings.HasPrefix(phone, "0") {
+			normalized[i] = "84" + phone[1:]
+		}
+	}
+	return normalized
+}

@@ -18,11 +18,15 @@ type (
 		PhonebookVersion  uint                  `json:"phonebook_version"`
 		ChangedProfiles   map[string]model.User `json:"changed_profiles"`
 	}
-	GetUserInfoFn = func(ctx context.Context, userId ...string) (*GetUserInfoResponse, error)
+	GetUserInfoFn = func(ctx context.Context, avatarSize model.AvatarSize, userId ...string) (*GetUserInfoResponse, error)
 )
 
 func (a *api) GetUserInfo(ctx context.Context, userID ...string) (*GetUserInfoResponse, error) {
-	return a.e.GetUserInfo(ctx, userID...)
+	return a.e.GetUserInfo(ctx, model.AvatarSizeSmall, userID...)
+}
+
+func (a *api) GetUserInfoWithAvatarSize(ctx context.Context, avatarSize model.AvatarSize, userID ...string) (*GetUserInfoResponse, error) {
+	return a.e.GetUserInfo(ctx, avatarSize, userID...)
 }
 
 var getUserInfoFactory = apiFactory[*GetUserInfoResponse, GetUserInfoFn]()(
@@ -30,7 +34,10 @@ var getUserInfoFactory = apiFactory[*GetUserInfoResponse, GetUserInfoFn]()(
 		base := jsonx.FirstOr(sc.GetZpwService("profile"), "")
 		serviceURL := u.MakeURL(base+"/api/social/friend/getprofiles/v2", nil, true)
 
-		return func(ctx context.Context, userID ...string) (*GetUserInfoResponse, error) {
+		return func(ctx context.Context, avatarSize model.AvatarSize, userID ...string) (*GetUserInfoResponse, error) {
+			if !avatarSize.IsValid() {
+				return nil, ErrInvalidAvatarSize
+			}
 			for i := range userID {
 				if strings.IndexByte(userID[i], '_') < 0 {
 					userID[i] += "_0"
@@ -40,7 +47,7 @@ var getUserInfoFactory = apiFactory[*GetUserInfoResponse, GetUserInfoFn]()(
 			payload := map[string]any{
 				"phonebook_version":   sc.ExtraVer().Phonebook,
 				"friend_pversion_map": userID,
-				"avatar_size":         120,
+				"avatar_size":         avatarSize,
 				"language":            sc.Language(),
 				"show_online_status":  1,
 				"imei":                sc.IMEI(),

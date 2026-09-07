@@ -13,11 +13,15 @@ import (
 
 type (
 	GetAllFriendsResponse []model.User
-	GetAllFriendsFn       = func(ctx context.Context, options model.OffsetPaginationOptions) (*GetAllFriendsResponse, error)
+	GetAllFriendsFn       = func(ctx context.Context, options model.OffsetPaginationOptions, avatarSize model.AvatarSize) (*GetAllFriendsResponse, error)
 )
 
 func (a *api) GetAllFriends(ctx context.Context, options model.OffsetPaginationOptions) (*GetAllFriendsResponse, error) {
-	return a.e.GetAllFriends(ctx, options)
+	return a.e.GetAllFriends(ctx, options, model.AvatarSizeSmall)
+}
+
+func (a *api) GetAllFriendsWithAvatarSize(ctx context.Context, options model.OffsetPaginationOptions, avatarSize model.AvatarSize) (*GetAllFriendsResponse, error) {
+	return a.e.GetAllFriends(ctx, options, avatarSize)
 }
 
 var getAllFriendsFactory = apiFactory[*GetAllFriendsResponse, GetAllFriendsFn]()(
@@ -25,7 +29,10 @@ var getAllFriendsFactory = apiFactory[*GetAllFriendsResponse, GetAllFriendsFn]()
 		base := jsonx.FirstOr(sc.GetZpwService("profile"), "")
 		serviceURL := u.MakeURL(base+"/api/social/friend/getfriends", nil, true)
 
-		return func(ctx context.Context, options model.OffsetPaginationOptions) (*GetAllFriendsResponse, error) {
+		return func(ctx context.Context, options model.OffsetPaginationOptions, avatarSize model.AvatarSize) (*GetAllFriendsResponse, error) {
+			if !avatarSize.IsValid() {
+				return nil, ErrInvalidAvatarSize
+			}
 			if options.Count <= 0 {
 				options.Count = 20000
 			}
@@ -37,7 +44,7 @@ var getAllFriendsFactory = apiFactory[*GetAllFriendsResponse, GetAllFriendsFn]()
 				"page":        options.Page,
 				"count":       options.Count,
 				"incInvalid":  1,
-				"avatar_size": 120,
+				"avatar_size": avatarSize,
 				"actiontime":  0,
 				"imei":        sc.IMEI(),
 			}
