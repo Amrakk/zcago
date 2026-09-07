@@ -12,6 +12,12 @@ import (
 	"github.com/amrakk/zcago/session"
 )
 
+var (
+	ErrStickerThreadIDEmpty = errs.NewZCA("threadID cannot be empty", "api.SendSticker")
+	ErrStickerIDEmpty       = errs.NewZCA("sticker ID cannot be zero", "api.SendSticker")
+	ErrStickerTypeEmpty     = errs.NewZCA("sticker type cannot be zero", "api.SendSticker")
+)
+
 type (
 	SendStickerPayload struct {
 		ID     int `json:"id"`
@@ -40,6 +46,10 @@ var sendStickerFactory = apiFactory[*SendStickerResponse, SendStickerFn]()(
 		}
 
 		return func(ctx context.Context, threadID string, threadType model.ThreadType, sticker SendStickerPayload) (*SendStickerResponse, error) {
+			if err := validateSendSticker(threadID, sticker); err != nil {
+				return nil, err
+			}
+
 			key := "grid"
 			if threadType == model.ThreadTypeUser {
 				key = "toid"
@@ -74,3 +84,16 @@ var sendStickerFactory = apiFactory[*SendStickerResponse, SendStickerFn]()(
 		}, nil
 	},
 )
+
+func validateSendSticker(threadID string, sticker SendStickerPayload) error {
+	switch {
+	case threadID == "":
+		return ErrStickerThreadIDEmpty
+	case sticker.ID == 0:
+		return ErrStickerIDEmpty
+	case sticker.Type == 0:
+		return ErrStickerTypeEmpty
+	default:
+		return nil
+	}
+}

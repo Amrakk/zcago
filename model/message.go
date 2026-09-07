@@ -1,8 +1,9 @@
 package model
 
 import (
+	"bytes"
 	"encoding/json"
-	"strconv"
+	"math/big"
 
 	"github.com/amrakk/zcago/config"
 	"github.com/amrakk/zcago/errs"
@@ -153,7 +154,7 @@ type TQuote struct {
 func (tq *TQuote) UnmarshalJSON(data []byte) error {
 	type alias TQuote
 	aux := &struct {
-		OwnerID int `json:"ownerId"`
+		OwnerID json.RawMessage `json:"ownerId"`
 		*alias
 	}{
 		alias: (*alias)(tq),
@@ -163,7 +164,19 @@ func (tq *TQuote) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	tq.OwnerID = strconv.Itoa(aux.OwnerID)
+	rawOwnerID := bytes.TrimSpace(aux.OwnerID)
+	if len(rawOwnerID) > 0 && rawOwnerID[0] == '"' {
+		if err := json.Unmarshal(rawOwnerID, &tq.OwnerID); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	ownerID, ok := new(big.Int).SetString(string(rawOwnerID), 10)
+	if !ok {
+		return errs.NewZCA("quote ownerId must be a string or integer", "model.TQuote.UnmarshalJSON")
+	}
+	tq.OwnerID = ownerID.String()
 	return nil
 }
 

@@ -877,7 +877,7 @@ type API interface {
 	//   - threadType - thread type
 	//   - sticker - sticker object
 	//
-	// Errors: errs.ZaloAPIError
+	// Errors: errs.ZaloAPIError, api.ErrStickerThreadIDEmpty, api.ErrStickerIDEmpty, api.ErrStickerTypeEmpty
 	SendSticker(ctx context.Context, threadID string, threadType model.ThreadType, sticker api.SendStickerPayload) (*api.SendStickerResponse, error)
 	// SendTypingEvent sends a typing event to a user or group.
 	//
