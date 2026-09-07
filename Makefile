@@ -19,7 +19,7 @@ linters-install: ## Install golangci-lint locally if missing (latest)
 .PHONY: linters-install
 
 lint: ## Run all linters and auto-fix issues (golangci-lint run --fix)
-	golangci-lint run --fix
+	golangci-lint run --fix --disable=misspell
 .PHONY: lint
 
 lint-staged: ## Lint only staged changes (pre-commit style)

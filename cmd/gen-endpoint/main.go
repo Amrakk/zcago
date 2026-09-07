@@ -158,10 +158,17 @@ func patchApisFile(cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	resType := cfg.Name + "Response"
-	methodLine := fmt.Sprintf("%s(ctx context.Context) (api.%s, error)", cfg.Name, resType)
+	name := cfg.Name
+	resType := name + "Response"
+	methodLine := fmt.Sprintf(`// %s <endpoint description>
+	//
+	// Params:
+	//   - ctx — cancel/deadline control
+	//
+	// Errors: errs.ZaloAPIError
+	%s(ctx context.Context) (api.%s, error)`, name, name, resType)
 
-	src, err = insertSortedMethodEntriesAfterMarker(src, markerMethods, methodLine)
+	src, err = insertSortedMethodEntriesAfterMarker(src, markerMethods, name, methodLine)
 	if err != nil {
 		return fmt.Errorf("insert method: %w", err)
 	}
@@ -232,7 +239,7 @@ type methodEntry struct {
 
 var reClose = regexp.MustCompile(`(?m)^\s*\}\s*$`)
 
-func insertSortedMethodEntriesAfterMarker(src, marker, codeLine string) (string, error) {
+func insertSortedMethodEntriesAfterMarker(src, marker, name, codeLine string) (string, error) {
 	mEnd, indent, err := findMarkerAndIndent(src, marker)
 	if err != nil {
 		return "", err
@@ -271,10 +278,15 @@ func insertSortedMethodEntriesAfterMarker(src, marker, codeLine string) (string,
 	}
 
 	// append if missing
-	if !containsMethod(entries, codeLine) {
-		t := strings.TrimSpace(codeLine)
+	if !containsMethod(entries, name) {
+		lines := strings.Split(strings.TrimSpace(codeLine), "\n")
+		code := strings.TrimSpace(lines[len(lines)-1])
+		docs := lines[:len(lines)-1]
+		for i := range docs {
+			docs[i] = indent + strings.TrimSpace(docs[i])
+		}
 		entries = append(entries, methodEntry{
-			code: t, key: strings.ToLower(extractFieldKey(t)),
+			docs: docs, code: code, key: strings.ToLower(extractFieldKey(code)),
 		})
 	}
 
@@ -295,10 +307,9 @@ func insertSortedMethodEntriesAfterMarker(src, marker, codeLine string) (string,
 	return src[:mEnd] + b.String() + after[cLocs[0]:], nil
 }
 
-func containsMethod(entries []methodEntry, codeLine string) bool {
-	needle := strings.TrimSpace(codeLine)
+func containsMethod(entries []methodEntry, name string) bool {
 	for _, e := range entries {
-		if strings.TrimSpace(e.code) == needle {
+		if extractFieldKey(e.code) == name {
 			return true
 		}
 	}

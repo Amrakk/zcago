@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"go/format"
 	"io/fs"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -42,12 +42,14 @@ func readFileString(path string) (string, error) {
 }
 
 func writeAndFmt(path, content string) error {
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return fmt.Errorf("write %s: %w", path, err)
+	// Format the content string directly in memory
+	formatted, err := format.Source([]byte(content))
+	if err != nil {
+		return fmt.Errorf("gofmt error: %w", err)
 	}
-	// format the file
-	if err := exec.Command("gofmt", "-w", path).Run(); err != nil {
-		return fmt.Errorf("gofmt %s: %w", path, err)
+
+	if err := os.WriteFile(path, formatted, 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }
