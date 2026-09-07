@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/amrakk/zcago/errs"
@@ -103,7 +102,10 @@ func (bi *BoardItem) UnmarshalJSON(data []byte) error {
 		}
 		bi.Data = &pinned
 	default:
-		return fmt.Errorf("unknown board type: %d", aux.BoardType)
+		bi.Data = &model.UnknownBoardData{
+			BoardType: aux.BoardType,
+			Raw:       append(json.RawMessage(nil), aux.Data...),
+		}
 	}
 
 	return nil

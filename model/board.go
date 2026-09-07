@@ -16,6 +16,15 @@ type BoardData interface {
 	GetBoardType() BoardType
 }
 
+type UnknownBoardData struct {
+	BoardType BoardType
+	Raw       json.RawMessage
+}
+
+func (d *UnknownBoardData) GetBoardType() BoardType { return d.BoardType }
+
+func (d *UnknownBoardData) MarshalJSON() ([]byte, error) { return d.Raw.MarshalJSON() }
+
 type PollDetail struct {
 	PollID            int          `json:"poll_id"`
 	Creator           string       `json:"creator"`
