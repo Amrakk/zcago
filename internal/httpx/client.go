@@ -86,7 +86,7 @@ func executeRequest(sc session.MutableContext, req *http.Request, followRedirect
 		}
 	}
 
-	return client.Do(req)
+	return client.Do(req) //nolint:gosec // Generic HTTP helper intentionally sends URLs selected by its callers.
 }
 
 func handleZaloResponse[T any](
