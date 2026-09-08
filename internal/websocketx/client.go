@@ -2,8 +2,8 @@ package websocketx
 
 import (
 	"context"
+	"net"
 	"sync"
-	"time"
 
 	"github.com/coder/websocket"
 )
@@ -45,7 +45,7 @@ type writeRequest struct {
 type client struct {
 	conn    *websocket.Conn
 	connCtx context.Context
-	cancel  context.CancelFunc
+	done    chan struct{}
 	wg      sync.WaitGroup
 	once    sync.Once
 
@@ -90,11 +90,10 @@ func Dial(ctx context.Context, url string, opt *Options) (*client, error) {
 		return nil, err
 	}
 
-	cctx, cancel := context.WithCancel(ctx)
 	cl := &client{
 		conn:       conn,
-		connCtx:    cctx,
-		cancel:     cancel,
+		connCtx:    ctx,
+		done:       make(chan struct{}),
 		msgChan:    make(chan Message, cfg.MsgBuf),
 		errChan:    make(chan error, cfg.ErrBuf),
 		closedChan: make(chan CloseInfo, 1),
@@ -103,11 +102,11 @@ func Dial(ctx context.Context, url string, opt *Options) (*client, error) {
 
 	// Reader
 	cl.wg.Add(1)
-	go cl.readLoop(cctx)
+	go cl.readLoop(ctx)
 
 	// Writer
 	cl.wg.Add(1)
-	go cl.writeLoop(cctx)
+	go cl.writeLoop(ctx)
 
 	return cl, nil
 }
@@ -125,10 +124,14 @@ func (c *client) Write(ctx context.Context, typ websocket.MessageType, data []by
 	}
 
 	select {
+	case <-c.done:
+		return net.ErrClosed
 	case c.writeQueue <- req:
 		select {
 		case err := <-req.result:
 			return err
+		case <-c.done:
+			return net.ErrClosed
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -149,12 +152,6 @@ func (c *client) readLoop(ctx context.Context) {
 	defer c.wg.Done()
 
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		typ, data, err := c.conn.Read(ctx)
 		if err != nil {
 			if c.isFatalErr(err) {
@@ -178,7 +175,10 @@ func (c *client) writeLoop(ctx context.Context) {
 
 	for {
 		select {
+		case <-c.done:
+			return
 		case <-ctx.Done():
+			c.shutdown(closeInfoFromErr(ctx.Err()), false)
 			return
 		case req := <-c.writeQueue:
 			err := c.conn.Write(req.ctx, req.typ, req.data)
@@ -198,15 +198,13 @@ func (c *client) writeLoop(ctx context.Context) {
 
 func (c *client) shutdown(ci CloseInfo, sendCloseFrame bool) {
 	c.once.Do(func() {
+		close(c.done)
 		c.pushClose(ci)
 		if sendCloseFrame {
-			_, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
 			_ = c.conn.Close(websocket.StatusCode(ci.Code), ci.Reason)
 		} else {
 			_ = c.conn.CloseNow()
 		}
-		c.cancel()
 		go func() {
 			c.wg.Wait()
 			close(c.msgChan)
