@@ -26,22 +26,7 @@ type LoginQRCallback func(event LoginQREvent)
 
 func LoginQR(ctx context.Context, sc session.MutableContext, qrPath string, cb LoginQRCallback) (*LoginQRResult, error) {
 	for {
-		setup := setupQRAttempt(ctx, qrPath, cb)
-
-		stopTimeout := func() {}
-
-		go func() {
-			res, stopTimeoutFn, err := runQRAttempt(setup.attemptCtx, sc, setup.config)
-			stopTimeout = stopTimeoutFn
-			if err != nil {
-				setup.errCh <- err
-				return
-			}
-			setup.resultCh <- res
-		}()
-
-		result := handleAttemptResult(ctx, sc, setup)
-		cleanupAttempt(stopTimeout, setup.cancelAttempt)
+		result := runSingleQRAttempt(ctx, sc, qrPath, cb)
 
 		if result.shouldRetry {
 			ctx = result.newCtx
@@ -56,19 +41,38 @@ func LoginQR(ctx context.Context, sc session.MutableContext, qrPath string, cb L
 	}
 }
 
+func runSingleQRAttempt(ctx context.Context, sc session.MutableContext, qrPath string, cb LoginQRCallback) attemptResult {
+	attemptCtx, cancelAttempt := context.WithCancel(ctx)
+	defer cancelAttempt()
+
+	setup := setupQRAttempt(attemptCtx, qrPath, cb)
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		res, err := runQRAttempt(attemptCtx, sc, setup.config)
+		if err != nil {
+			setup.errCh <- err
+			return
+		}
+		setup.resultCh <- res
+	}()
+
+	result := handleAttemptResult(ctx, sc, setup)
+	cancelAttempt()
+	<-workerDone
+	return result
+}
+
 type qrAttemptSetup struct {
-	attemptCtx    context.Context
-	cancelAttempt context.CancelFunc
-	retryCh       chan context.Context
-	abortCh       chan struct{}
-	resultCh      chan *LoginQRResult
-	errCh         chan error
-	config        qrAttemptConfig
+	attemptCtx context.Context
+	retryCh    chan context.Context
+	abortCh    chan struct{}
+	resultCh   chan *LoginQRResult
+	errCh      chan error
+	config     qrAttemptConfig
 }
 
 func setupQRAttempt(ctx context.Context, qrPath string, cb LoginQRCallback) *qrAttemptSetup {
-	attemptCtx, cancelAttempt := context.WithCancel(ctx)
-
 	retryCh := make(chan context.Context, 1)
 	abortCh := make(chan struct{}, 1)
 	resultCh := make(chan *LoginQRResult, 1)
@@ -103,19 +107,13 @@ func setupQRAttempt(ctx context.Context, qrPath string, cb LoginQRCallback) *qrA
 	}
 
 	return &qrAttemptSetup{
-		attemptCtx:    attemptCtx,
-		cancelAttempt: cancelAttempt,
-		retryCh:       retryCh,
-		abortCh:       abortCh,
-		resultCh:      resultCh,
-		errCh:         errCh,
-		config:        config,
+		attemptCtx: ctx,
+		retryCh:    retryCh,
+		abortCh:    abortCh,
+		resultCh:   resultCh,
+		errCh:      errCh,
+		config:     config,
 	}
-}
-
-func cleanupAttempt(stopTimeout func(), cancelAttempt context.CancelFunc) {
-	stopTimeout()
-	cancelAttempt()
 }
 
 type attemptResult struct {
@@ -154,7 +152,7 @@ type qrAttemptConfig struct {
 	retryCh chan context.Context
 }
 
-func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttemptConfig) (*LoginQRResult, func(), error) {
+func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttemptConfig) (*LoginQRResult, error) {
 	qrPath := config.qrPath
 	cb := config.cb
 	ctrl := config.ctrl
@@ -164,7 +162,7 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 
 	ver, err := loadLoginPage(ctx, sc)
 	if err != nil {
-		return nil, nil, errs.NewZCA("Cannot get API login version", "auth.LoginQR")
+		return nil, errs.NewZCA("Cannot get API login version", "auth.LoginQR")
 	}
 
 	logger.Log(sc).Info("Login version: ", ver)
@@ -174,18 +172,19 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 
 	qrData, imgBytes, err := generateAndProcessQR(ctx, sc, ver)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := handleQRCallback(cb, ctrl, qrData, imgBytes, qrPath, sc); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	stopTimeout := setupQRTimeout(ctx, sc, cb, ctrl, retryCh)
+	defer stopTimeout()
 
 	scanResult, err := waitingScan(ctx, sc, ver, qrData.Code)
 	if err != nil {
-		return nil, stopTimeout, errs.NewZCA("Cannot get scan result", "auth.LoginQR")
+		return nil, errs.NewZCA("Cannot get scan result", "auth.LoginQR")
 	}
 
 	if cb != nil {
@@ -196,17 +195,17 @@ func runQRAttempt(ctx context.Context, sc session.MutableContext, config qrAttem
 	}
 
 	if err := processConfirmation(ctx, sc, ver, qrData.Code, cb, actions); err != nil {
-		return nil, stopTimeout, err
+		return nil, err
 	}
 
 	userInfo, err := finalizeLogin(ctx, sc, scanResult.Data.DisplayName)
 	if err != nil {
-		return nil, stopTimeout, err
+		return nil, err
 	}
 
 	return &LoginQRResult{
 		UserInfo: userInfo.Data.Info,
-	}, stopTimeout, nil
+	}, nil
 }
 
 func generateAndProcessQR(ctx context.Context, sc session.MutableContext, ver string) (QRGeneratedData, []byte, error) {
